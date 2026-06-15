@@ -125,6 +125,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ex-note{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.5;font-style:italic}
 .ex-suggest{background:var(--amber-glow);border:1px solid rgba(221,34,34,.2);border-radius:5px;padding:7px 10px;margin-top:8px;font-size:12px;color:var(--amber)}
 
+/* STABILIZATION */
+.stab-color{color:#8866dd}
+.stab-section-lbl{font-size:10px;font-weight:700;color:#8866dd;text-transform:uppercase;letter-spacing:.8px;margin:10px 0 6px;display:flex;align-items:center;gap:6px}
+.stab-section-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.stab-row{background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:11px 12px;display:flex;align-items:center;gap:10px}
+.stab-check{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;font-size:12px}
+.stab-check.done{background:var(--green);border-color:var(--green);color:#000}
+.stab-info{flex:1}
+.stab-name{font-weight:600;font-size:13px}
+.stab-link{font-size:11px;color:var(--blue);margin-top:2px;display:block;text-decoration:none}
+
 .cardio-row{background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:11px 12px;display:flex;align-items:center;gap:10px}
 .cardio-check{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;font-size:12px}
 .cardio-check.done{background:var(--green);border-color:var(--green);color:#000}
@@ -535,6 +546,21 @@ const EXERCISES = {
   cardio_only: []
 };
 
+const STAB_EXERCISES = [
+  {id:'wall_slides',          name:'Wall Slides',           url:'https://www.youtube.com/watch?v=GaP20t6ZOfU', minWeek:1},
+  {id:'band_pull_aparts',     name:'Band Pull-Aparts',      url:'https://www.youtube.com/watch?v=RoL5784uNwg', minWeek:1},
+  {id:'clamshells',           name:'Clamshells',            url:'https://www.youtube.com/watch?v=gN9ukMKrdEo', minWeek:1},
+  {id:'glute_bridge_hold',    name:'Glute Bridge Hold',     url:'https://www.youtube.com/watch?v=OUgsJ8-Vi0E', minWeek:1, maxWeek:3},
+  {id:'dead_bug_stab',        name:'Dead Bug',              url:'https://www.youtube.com/watch?v=DYf9ozrQ8-M', minWeek:1},
+  {id:'wrist_mobility',       name:'Wrist & Hand Mobility', url:'https://www.youtube.com/watch?v=mH5Sfb_KTGg', minWeek:1},
+  {id:'dead_hang',            name:'Dead Hang',             url:'https://www.youtube.com/watch?v=5FQJJvUAYx4', minWeek:2},
+  {id:'single_leg_balance',   name:'Single-Leg Balance',    url:'https://m.youtube.com/watch?v=tuA9yGQZOII',   minWeek:2},
+  {id:'bird_dog',             name:'Bird Dog',              url:'https://www.youtube.com/watch?v=lKH7e4g0yWA', minWeek:3},
+  {id:'side_lying_leg_raises',name:'Side-Lying Leg Raises', url:'https://www.youtube.com/watch?v=CTmFNSDJTR8', minWeek:3},
+  {id:'single_leg_glute_bridge',name:'Single-Leg Glute Bridge',url:'https://www.youtube.com/watch?v=OUgsJ8-Vi0E',minWeek:4},
+  {id:'forearm_plank',        name:'Forearm Plank',         url:'https://www.youtube.com/watch?v=gSDNblPRh1U', minWeek:4},
+];
+
 const DAY_PLAN = {
   1: {type:'push', label:'PUSH DAY', color:'push-color', cardio:['treadmill','row']},
   2: {type:'cardio_only', label:'CARDIO', color:'cardio-color', cardio:['treadmill']},
@@ -608,7 +634,7 @@ function defaultEntry() {
   return {
     date: todayStr,
     weight: null,
-    workout: { exercises:{}, cardio:{}, notes:'' },
+    workout: { exercises:{}, cardio:{}, stab:{}, notes:'' },
     food: { meals:{}, cheats:{}, notes:'' },
     meds: {},
     water: { total:0, log:[] },
@@ -733,16 +759,24 @@ async function init() {
   renderAll();
 }
 
+function getWeekNum() {
+  const start = new Date('2025-06-11');
+  const diff = (TODAY - start) / (1000*60*60*24*7);
+  return Math.max(1, Math.floor(diff) + 1);
+}
+
+function getStabForWeek() {
+  const wk = getWeekNum();
+  return STAB_EXERCISES.filter(e => wk >= e.minWeek && (!e.maxWeek || wk <= e.maxWeek));
+}
+
 function updateHeader() {
   const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   document.getElementById('headerDate').textContent =
     `${dow[TODAY.getDay()]} ${months[TODAY.getMonth()]} ${TODAY.getDate()}`;
 
-  // Week number from June 11 start
-  const start = new Date('2025-06-11');
-  const diff = (TODAY - start) / (1000*60*60*24*7);
-  const wk = Math.max(1, Math.min(24, Math.floor(diff) + 1));
+  const wk = getWeekNum();
   document.getElementById('headerWeek').textContent = `WK ${wk}`;
   document.getElementById('weekBadgeMain').textContent = `WK ${wk}`;
 }
@@ -875,81 +909,125 @@ function calcTodayCals() {
 // WORKOUT
 // ═══════════════════════════════════════════════════════
 
+function renderExercisesHtml(exercises) {
+  return exercises.map(ex => {
+    const last = getLastWeight(ex.id);
+    const suggest = getSuggestedWeight(ex.id);
+    const saved = currentEntry.workout.exercises[ex.id];
+
+    let flagHtml = '';
+    if(!last) flagHtml = `<span class="ex-flag flag-new">NEW</span>`;
+    else if(suggest?.ready) flagHtml = `<span class="ex-flag flag-up">↑ MOVE UP</span>`;
+    else flagHtml = `<span class="ex-flag flag-hold">HOLD</span>`;
+
+    const lastText = last ? `${last.weight} lbs` : 'No log yet';
+    const isExpanded = saved?.expanded;
+
+    return `<div class="exercise-row${isExpanded?' expanded':''}" id="exrow-${ex.id}">
+      <div class="ex-hdr" onclick="toggleExercise('${ex.id}')">
+        <div>
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-last">${ex.eq} · ${ex.sets}×${ex.reps} · Last: ${lastText}</div>
+        </div>
+        ${flagHtml}
+      </div>
+      <div class="ex-body" id="exbody-${ex.id}" style="display:${isExpanded?'block':'none'}">
+        ${suggest?.ready ? `<div class="ex-suggest">💡 Ready to move up → try <strong>${suggest.suggest} lbs</strong> this session</div>` : ''}
+        <div class="ex-inputs">
+          ${[1,2,3].map(s => {
+            const setData = saved?.sets?.[s-1] || {};
+            return `<div class="ex-field">
+              <label>SET ${s}</label>
+              <input type="number" placeholder="${suggest?.suggest||last?.weight||'lbs'}"
+                value="${setData.weight||''}"
+                id="ex-${ex.id}-set${s}-w" oninput="updateExSet('${ex.id}',${s},'weight',this.value)">
+              <div style="font-size:9px;color:var(--dim);text-align:center;margin-top:3px">lbs</div>
+              <input type="number" placeholder="${ex.reps.split('–')[0]||'10'}"
+                value="${setData.reps||''}"
+                id="ex-${ex.id}-set${s}-r" oninput="updateExSet('${ex.id}',${s},'reps',this.value)"
+                style="margin-top:4px">
+              <div style="font-size:9px;color:var(--dim);text-align:center;margin-top:3px">reps</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" id="ex-${ex.id}-allreps" ${saved?.allRepsHit?'checked':''}
+              onchange="updateExAllReps('${ex.id}',this.checked)"
+              style="accent-color:var(--green);width:16px;height:16px">
+            <span style="color:var(--dim)">Hit all reps on every set</span>
+          </label>
+        </div>
+        <div class="ex-note">${ex.note}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderWorkout() {
   const plan = getDayPlan(todayStr);
+  const wk = getWeekNum();
+  const isStrengthDay = ['push','pull','legs'].includes(plan.type);
+  const isRestDay = plan.type === 'rest';
   const typeLabel = document.getElementById('workoutTypeLabel');
-  typeLabel.textContent = plan.label;
-  typeLabel.className = 'workout-type ' + plan.color;
+
+  if(wk <= 2 && isStrengthDay) {
+    typeLabel.textContent = 'STABILIZATION';
+    typeLabel.className = 'workout-type stab-color';
+  } else {
+    typeLabel.textContent = plan.label;
+    typeLabel.className = 'workout-type ' + plan.color;
+  }
   document.getElementById('workoutDayBadge').textContent =
     ['SUN','MON','TUE','WED','THU','FRI','SAT'][getDow(todayStr)];
 
-  // Exercises
+  const stabExes = getStabForWeek();
   const exList = document.getElementById('exerciseList');
-  const exercises = EXERCISES[plan.type] || [];
-  if(exercises.length === 0) {
-    exList.innerHTML = plan.type === 'rest'
-      ? `<div class="empty-state"><div class="streak-fire">🌿</div>Full rest day. Sleep well and recover.</div>`
-      : `<div class="empty-state">Cardio only today.</div>`;
+
+  const stabRowHtml = ex => {
+    const done = currentEntry.workout.stab?.[ex.id];
+    return `<div class="stab-row">
+      <div class="stab-check${done?' done':''}" onclick="toggleStab('${ex.id}')">${done?'✓':''}</div>
+      <div class="stab-info">
+        <div class="stab-name">${ex.name}</div>
+        <a class="stab-link" href="${ex.url}" target="_blank">▶ Watch on YouTube</a>
+      </div>
+    </div>`;
+  };
+
+  const stabSectionHtml = label =>
+    `<div class="stab-section-lbl">${label}</div>` + stabExes.map(stabRowHtml).join('');
+
+  if(isRestDay) {
+    exList.innerHTML = `<div class="empty-state"><div class="streak-fire">🌿</div>Full rest day. Sleep well and recover.</div>`;
+  } else if(wk <= 2) {
+    // Weeks 1–2: cardio + stabilization only, no strength split
+    exList.innerHTML = stabSectionHtml('STABILIZATION');
+  } else if(wk <= 4) {
+    // Weeks 3–4: stabilization + Push/Pull/Legs on strength days
+    if(isStrengthDay) {
+      exList.innerHTML = stabSectionHtml('STABILIZATION') +
+        `<div class="stab-section-lbl">${plan.label}</div>` +
+        renderExercisesHtml(EXERCISES[plan.type] || []);
+    } else {
+      exList.innerHTML = stabSectionHtml('STABILIZATION');
+    }
   } else {
-    exList.innerHTML = exercises.map(ex => {
-      const last = getLastWeight(ex.id);
-      const suggest = getSuggestedWeight(ex.id);
-      const saved = currentEntry.workout.exercises[ex.id];
-
-      let flagHtml = '';
-      if(!last) flagHtml = `<span class="ex-flag flag-new">NEW</span>`;
-      else if(suggest?.ready) flagHtml = `<span class="ex-flag flag-up">↑ MOVE UP</span>`;
-      else flagHtml = `<span class="ex-flag flag-hold">HOLD</span>`;
-
-      const lastText = last ? `${last.weight} lbs` : 'No log yet';
-      const isExpanded = saved?.expanded;
-
-      return `<div class="exercise-row${isExpanded?' expanded':''}" id="exrow-${ex.id}">
-        <div class="ex-hdr" onclick="toggleExercise('${ex.id}')">
-          <div>
-            <div class="ex-name">${ex.name}</div>
-            <div class="ex-last">${ex.eq} · ${ex.sets}×${ex.reps} · Last: ${lastText}</div>
-          </div>
-          ${flagHtml}
-        </div>
-        <div class="ex-body" id="exbody-${ex.id}" style="display:${isExpanded?'block':'none'}">
-          ${suggest?.ready ? `<div class="ex-suggest">💡 Ready to move up → try <strong>${suggest.suggest} lbs</strong> this session</div>` : ''}
-          <div class="ex-inputs">
-            ${[1,2,3].map(s => {
-              const setData = saved?.sets?.[s-1] || {};
-              return `<div class="ex-field">
-                <label>SET ${s}</label>
-                <input type="number" placeholder="${suggest?.suggest||last?.weight||'lbs'}"
-                  value="${setData.weight||''}"
-                  id="ex-${ex.id}-set${s}-w" oninput="updateExSet('${ex.id}',${s},'weight',this.value)">
-                <div style="font-size:9px;color:var(--dim);text-align:center;margin-top:3px">lbs</div>
-                <input type="number" placeholder="${ex.reps.split('–')[0]||'10'}"
-                  value="${setData.reps||''}"
-                  id="ex-${ex.id}-set${s}-r" oninput="updateExSet('${ex.id}',${s},'reps',this.value)"
-                  style="margin-top:4px">
-                <div style="font-size:9px;color:var(--dim);text-align:center;margin-top:3px">reps</div>
-              </div>`;
-            }).join('')}
-          </div>
-          <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-              <input type="checkbox" id="ex-${ex.id}-allreps" ${saved?.allRepsHit?'checked':''}
-                onchange="updateExAllReps('${ex.id}',this.checked)"
-                style="accent-color:var(--green);width:16px;height:16px">
-              <span style="color:var(--dim)">Hit all reps on every set</span>
-            </label>
-          </div>
-          <div class="ex-note">${ex.note}</div>
-        </div>
-      </div>`;
-    }).join('');
+    // Week 5+: full strength split, stabilization as warmup on strength days only
+    if(isStrengthDay) {
+      exList.innerHTML = stabSectionHtml('WARMUP — STABILIZATION') +
+        `<div class="stab-section-lbl">${plan.label}</div>` +
+        renderExercisesHtml(EXERCISES[plan.type] || []);
+    } else {
+      exList.innerHTML = `<div class="empty-state">Cardio only today.</div>`;
+    }
   }
 
   // Cardio
   const cardioList = document.getElementById('cardioList');
   const cardioIds = plan.cardio || [];
   const toShow = [...cardioIds];
-  if(plan.type !== 'rest') toShow.push('lunch_walk');
+  if(!isRestDay) toShow.push('lunch_walk');
 
   cardioList.innerHTML = toShow.map(cid => {
     const ct = CARDIO_TARGETS[cid];
@@ -990,6 +1068,12 @@ function updateExAllReps(exId, checked) {
 
 function toggleCardio(cid) {
   currentEntry.workout.cardio[cid] = !currentEntry.workout.cardio[cid];
+  renderWorkout();
+}
+
+function toggleStab(id) {
+  if(!currentEntry.workout.stab) currentEntry.workout.stab = {};
+  currentEntry.workout.stab[id] = !currentEntry.workout.stab[id];
   renderWorkout();
 }
 
