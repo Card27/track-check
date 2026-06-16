@@ -291,6 +291,17 @@ select:focus{outline:none;border-color:var(--amber)}
 .energy-log-entry{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--faint);font-size:13px}
 .energy-log-time{font-family:var(--font-mono);font-size:10px;color:var(--dim);min-width:55px}
 .energy-log-del{margin-left:auto;color:var(--dim);cursor:pointer;font-size:16px}
+/* ── FEELING ── */
+.feeling-section-hdr{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;display:flex;align-items:center;gap:6px}
+.feeling-section-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+.feeling-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--faint)}
+.feeling-row:last-child{border-bottom:none}
+.feeling-lbl{flex:1;min-width:0}
+.feeling-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.feeling-desc{font-size:10px;color:var(--dim);margin-top:1px}
+.feeling-scale{display:flex;gap:5px;flex-shrink:0}
+.f-pip{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:15px;cursor:pointer;border:2px solid var(--border);background:var(--s3);color:var(--dim);transition:all .15s;user-select:none;-webkit-user-select:none}
+.feeling-num-row{display:flex;gap:12px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -381,7 +392,7 @@ select:focus{outline:none;border-color:var(--amber)}
         <div class="stab" onclick="switchSection('meds',this)">MEDS</div>
         <div class="stab" onclick="switchSection('water',this)">WATER</div>
         <div class="stab" onclick="switchSection('flare',this)">FLARE</div>
-        <div class="stab" onclick="switchSection('energy',this)">ENERGY</div>
+        <div class="stab" onclick="switchSection('feeling',this)">FEELING</div>
       </div>
 
       <!-- WORKOUT SECTION -->
@@ -477,7 +488,7 @@ select:focus{outline:none;border-color:var(--amber)}
       </div>
 
       <!-- ENERGY SECTION -->
-      <div id="section-energy" style="display:none"></div>
+      <div id="section-feeling" style="display:none"></div>
     </div>
 
     <!-- WEEK -->
@@ -604,6 +615,17 @@ const ENERGY_BTNS = [
   {level:5, tag:'high',     emoji:'⚡', label:'HIGH',       color:'var(--green)'},
 ];
 
+const FEELING_DIMS = [
+  {key:'mental',   label:'MENTAL',   desc:'mood · anxiety · depression',  section:'daily'},
+  {key:'physical', label:'PHYSICAL', desc:'general body feeling',          section:'daily'},
+  {key:'gut',      label:'GUT',      desc:'overall subjective sense',      section:'daily'},
+  {key:'energy',   label:'ENERGY',   desc:'energy level',                  section:'extra'},
+  {key:'clarity',  label:'CLARITY',  desc:'mental clarity · brain fog',    section:'extra'},
+  {key:'stress',   label:'STRESS',   desc:'stress load',                   section:'extra'},
+  {key:'sleep',    label:'SLEEP',    desc:'subjective sleep quality',       section:'extra'},
+];
+const PIP_COLORS = ['', '#e04444', '#cc8833', '#7777a0', '#4488ee', '#44cc77'];
+
 const DAY_PLAN = {
   1: {type:'push', label:'PUSH DAY', color:'push-color', cardio:['treadmill','row']},
   2: {type:'cardio_only', label:'CARDIO', color:'cardio-color', cardio:['treadmill']},
@@ -688,7 +710,7 @@ function defaultEntry() {
     meds: {},
     water: { total:0, log:[] },
     flare: { status:'good', triggers:[], notes:'' },
-    energy: { logs:[] }
+    feeling: { mental:null, physical:null, gut:null, energy:null, clarity:null, stress:null, sleep:null, morningStiffness:null, subluxations:null, logs:[], notes:'' }
   };
 }
 
@@ -840,7 +862,7 @@ function updateHeader() {
 }
 
 function renderAll() {
-  [renderDash, renderWorkout, renderFood, renderMeds, renderWater, renderFlare, renderEnergy, renderWeekPage]
+  [renderDash, renderWorkout, renderFood, renderMeds, renderWater, renderFlare, renderFeeling, renderWeekPage]
     .forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
 }
 
@@ -947,12 +969,12 @@ function renderDash() {
   document.getElementById('weekGlance').innerHTML = weekHtml;
 
   // Energy today card
-  const eLogs = currentEntry.energy?.logs || [];
+  const eLogs = currentEntry.feeling?.logs || currentEntry.energy?.logs || [];
   const eSorted = [...eLogs].sort((a,b) => b.time - a.time);
   const eLatest = eSorted[0];
   let energyDashHtml = '';
   if(eLogs.length === 0) {
-    energyDashHtml = '<div class="empty-state" style="padding:8px">Tap ENERGY tab to start tracking</div>';
+    energyDashHtml = '<div class="empty-state" style="padding:8px">Tap FEELING tab to start tracking</div>';
   } else {
     const m = energyMeta(eLatest.tag);
     energyDashHtml = '';
@@ -1584,7 +1606,7 @@ function renderWeekPage() {
   HOUR_BUCKETS.forEach(h => { bucketData[h] = {levels:[], fogCount:0}; });
 
   Object.values(allHistory).forEach(entry => {
-    (entry.energy?.logs || []).forEach(log => {
+    (entry.feeling?.logs || entry.energy?.logs || []).forEach(log => {
       const hour = new Date(log.time).getHours();
       HOUR_BUCKETS.forEach(h => {
         if(hour >= h && hour < h + 2) {
@@ -1676,69 +1698,126 @@ function energyMiniChart(logs, W=300, H=60) {
 }
 
 function logEnergy(level, tag) {
-  if(!currentEntry.energy) currentEntry.energy = {logs:[]};
-  currentEntry.energy.logs.push({time: Date.now(), level, tag});
+  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+  if(!currentEntry.feeling.logs) currentEntry.feeling.logs = [];
+  currentEntry.feeling.logs.push({time: Date.now(), level, tag});
   saveToday(true);
-  renderEnergy();
+  renderFeeling();
   renderDash();
 }
 
 function deleteEnergyLog(idx) {
-  if(!currentEntry.energy?.logs) return;
-  currentEntry.energy.logs.splice(idx, 1);
+  const logs = currentEntry.feeling?.logs || currentEntry.energy?.logs;
+  if(!logs) return;
+  logs.splice(idx, 1);
   saveToday(true);
-  renderEnergy();
+  renderFeeling();
   renderDash();
 }
 
-function renderEnergy() {
-  const logs = currentEntry.energy?.logs || [];
+function renderFeeling() {
+  const f = currentEntry.feeling || {};
+  const logs = f.logs || currentEntry.energy?.logs || [];
   const sorted = [...logs].sort((a,b) => b.time - a.time);
 
+  // ── 1-5 scale rows ──
+  const pipRow = (dim) => {
+    const val = f[dim.key];
+    const pips = [1,2,3,4,5].map(n => {
+      const active = val === n;
+      const style = active ? `background:${PIP_COLORS[n]};border-color:${PIP_COLORS[n]};color:#fff` : '';
+      return `<div class="f-pip" style="${style}" onclick="setFeeling('${dim.key}',${n})">${n}</div>`;
+    }).join('');
+    return `<div class="feeling-row">
+      <div class="feeling-lbl">
+        <div class="feeling-name" style="color:${val?PIP_COLORS[val]:'var(--text)'}">${dim.label}</div>
+        <div class="feeling-desc">${dim.desc}</div>
+      </div>
+      <div class="feeling-scale">${pips}</div>
+    </div>`;
+  };
+
+  const dailyRows = FEELING_DIMS.filter(d=>d.section==='daily').map(pipRow).join('');
+  const extraRows = FEELING_DIMS.filter(d=>d.section==='extra').map(pipRow).join('');
+
+  // ── Condition-specific ──
+  const stiff = f.morningStiffness ?? '';
+  const subx  = f.subluxations   ?? '';
+  const condHtml = `
+    <div class="feeling-num-row">
+      <div class="ex-field" style="flex:1"><label>MORNING STIFFNESS (min)</label>
+        <input type="number" inputmode="numeric" step="1" value="${stiff}" placeholder="0"
+               onchange="updateFeelingField('morningStiffness',this.value)"></div>
+      <div class="ex-field" style="flex:1"><label>SUBLUXATIONS TODAY</label>
+        <input type="number" inputmode="numeric" step="1" value="${subx}" placeholder="0"
+               onchange="updateFeelingField('subluxations',this.value)"></div>
+    </div>`;
+
+  // ── Energy log ──
   const btnHtml = ENERGY_BTNS.map(b =>
     `<div class="energy-btn" onclick="logEnergy(${b.level},'${b.tag}')">
       <div class="energy-btn-emoji">${b.emoji}</div>
       <div class="energy-btn-label" style="color:${b.color}">${b.label}</div>
-    </div>`
-  ).join('');
+    </div>`).join('');
 
   const logHtml = sorted.length === 0
-    ? '<div class="empty-state" style="padding:12px">Tap a button above to log your energy</div>'
+    ? '<div class="empty-state" style="padding:10px">Tap a button above to log energy state</div>'
     : sorted.map(e => {
         const realIdx = logs.findIndex(l => l.time === e.time && l.tag === e.tag);
         const meta = energyMeta(e.tag);
         return `<div class="energy-log-entry">
           <div class="energy-log-time">${fmtTime(e.time)}</div>
           <div style="font-size:16px">${meta.emoji}</div>
-          <div style="font-weight:600;color:${e.tag==='brainfog'?'var(--purple)':meta.color};font-size:12px">${meta.label}</div>
+          <div style="font-weight:600;color:${meta.color};font-size:12px">${meta.label}</div>
           <div class="energy-log-del" onclick="deleteEnergyLog(${realIdx})">×</div>
         </div>`;
       }).join('');
 
   const chartHtml = logs.length >= 2
-    ? `<div class="mini-chart" style="height:60px;margin-bottom:10px">${energyMiniChart(logs)}</div>`
+    ? `<div class="mini-chart" style="height:55px;margin-bottom:10px">${energyMiniChart(logs)}</div>`
     : '';
 
-  const latest = sorted[0];
-  const latestHtml = latest
-    ? (() => { const m = energyMeta(latest.tag); return `<div style="font-size:11px;color:var(--dim);margin-top:8px;text-align:right">Last: ${m.emoji} ${m.label} · ${fmtTime(latest.time)}</div>`; })()
-    : '';
-
-  document.getElementById('section-energy').innerHTML = `
+  document.getElementById('section-feeling').innerHTML = `
     <div class="card">
-      <div class="card-hdr"><div class="card-icon">⚡</div><div class="card-title">LOG ENERGY</div></div>
-      <div class="card-body">
-        <div class="energy-btn-grid">${btnHtml}</div>
-        ${latestHtml}
-      </div>
+      <div class="card-hdr"><div class="card-icon">🧠</div><div class="card-title">DAILY DIMENSIONS</div></div>
+      <div class="card-body">${dailyRows}</div>
     </div>
     <div class="card">
-      <div class="card-hdr"><div class="card-icon">📋</div><div class="card-title">TODAY'S LOG</div></div>
+      <div class="card-hdr"><div class="card-icon">📊</div><div class="card-title">ADDITIONAL METRICS</div></div>
+      <div class="card-body">${extraRows}</div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-icon">🦴</div><div class="card-title">CONDITION-SPECIFIC</div></div>
+      <div class="card-body">${condHtml}</div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-icon">⚡</div><div class="card-title">ENERGY LOG</div></div>
       <div class="card-body">
+        <div class="energy-btn-grid">${btnHtml}</div>
         ${chartHtml}
         ${logHtml}
       </div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-icon">📝</div><div class="card-title">DAILY NOTES</div></div>
+      <div class="card-body">
+        <textarea class="notes-area" id="feelingNotes" placeholder="How are you feeling overall today?">${f.notes||''}</textarea>
+      </div>
     </div>`;
+}
+
+function setFeeling(key, val) {
+  if(!currentEntry.feeling) currentEntry.feeling = {};
+  currentEntry.feeling[key] = currentEntry.feeling[key] === val ? null : val;
+  saveToday(true);
+  renderFeeling();
+}
+
+function updateFeelingField(key, val) {
+  if(!currentEntry.feeling) currentEntry.feeling = {};
+  const parsed = parseFloat(val);
+  currentEntry.feeling[key] = isNaN(parsed) ? null : parsed;
+  saveToday(true);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1748,6 +1827,8 @@ function renderEnergy() {
 async function saveToday(silent=false) {
   currentEntry.workout.notes = document.getElementById('workoutNotes')?.value || '';
   currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
+  currentEntry.feeling = currentEntry.feeling || {};
+  currentEntry.feeling.notes = document.getElementById('feelingNotes')?.value || (currentEntry.feeling.notes || '');
 
   const ok = await stSet(todayStr, currentEntry);
   if(ok) {
@@ -1779,7 +1860,7 @@ function switchPage(name, el) {
 }
 
 function switchSection(name, el) {
-  ['workout','food','meds','water','flare','energy'].forEach(s=>{
+  ['workout','food','meds','water','flare','feeling'].forEach(s=>{
     document.getElementById('section-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.stab').forEach(t=>t.className='stab');
