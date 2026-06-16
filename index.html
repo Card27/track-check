@@ -758,11 +758,9 @@ function getWeekDays() {
   const days = [];
   const dow = TODAY.getDay();
   for(let i = 0; i < 7; i++) {
-    const day = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - dow + i);
-    const yyyy = day.getFullYear();
-    const mm = String(day.getMonth() + 1).padStart(2, '0');
-    const dd = String(day.getDate()).padStart(2, '0');
-    days.push(`${yyyy}-${mm}-${dd}`);
+    const d = new Date(TODAY);
+    d.setDate(TODAY.getDate() - dow + i);
+    days.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
   }
   return days;
 }
