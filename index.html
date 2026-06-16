@@ -671,7 +671,7 @@ async function stSet(dateStr, val) {
       headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ entry_date: dateStr, data: val, updated_at: new Date().toISOString() })
     });
-    return r.ok;
+    return r.status === 200 || r.status === 201 || r.status === 204;
   } catch(e) { return false; }
 }
 
