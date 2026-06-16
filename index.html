@@ -294,13 +294,14 @@ select:focus{outline:none;border-color:var(--amber)}
 /* ── FEELING ── */
 .feeling-section-hdr{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;display:flex;align-items:center;gap:6px}
 .feeling-section-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
-.feeling-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--faint)}
+.feeling-row{padding:9px 0;border-bottom:1px solid var(--faint)}
 .feeling-row:last-child{border-bottom:none}
-.feeling-lbl{flex:1;min-width:0}
+.feeling-row-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
 .feeling-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
-.feeling-desc{font-size:10px;color:var(--dim);margin-top:1px}
-.feeling-scale{display:flex;gap:5px;flex-shrink:0}
-.f-pip{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:15px;cursor:pointer;border:2px solid var(--border);background:var(--s3);color:var(--dim);transition:all .15s;user-select:none;-webkit-user-select:none}
+.feeling-val{font-family:var(--font-mono);font-size:11px}
+.feeling-desc{font-size:10px;color:var(--dim);margin-bottom:5px}
+.feeling-scale{display:flex;gap:3px;width:100%}
+.f-pip{flex:1;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--s3);color:var(--dim);transition:all .15s;user-select:none;-webkit-user-select:none}
 .feeling-num-row{display:flex;gap:12px;margin-top:8px}
 </style>
 </head>
@@ -624,7 +625,7 @@ const FEELING_DIMS = [
   {key:'stress',   label:'STRESS',   desc:'stress load',                   section:'extra'},
   {key:'sleep',    label:'SLEEP',    desc:'subjective sleep quality',       section:'extra'},
 ];
-const PIP_COLORS = ['', '#e04444', '#cc8833', '#7777a0', '#4488ee', '#44cc77'];
+const PIP_COLORS = ['', '#e04444', '#e05533', '#cc7722', '#cc9933', '#999944', '#667799', '#4488bb', '#4488ee', '#44bbaa', '#44cc77'];
 
 const DAY_PLAN = {
   1: {type:'push', label:'PUSH DAY', color:'push-color', cardio:['treadmill','row']},
@@ -1723,16 +1724,17 @@ function renderFeeling() {
   // ── 1-5 scale rows ──
   const pipRow = (dim) => {
     const val = f[dim.key];
-    const pips = [1,2,3,4,5].map(n => {
+    const pips = [1,2,3,4,5,6,7,8,9,10].map(n => {
       const active = val === n;
       const style = active ? `background:${PIP_COLORS[n]};border-color:${PIP_COLORS[n]};color:#fff` : '';
       return `<div class="f-pip" style="${style}" onclick="setFeeling('${dim.key}',${n})">${n}</div>`;
     }).join('');
     return `<div class="feeling-row">
-      <div class="feeling-lbl">
+      <div class="feeling-row-hdr">
         <div class="feeling-name" style="color:${val?PIP_COLORS[val]:'var(--text)'}">${dim.label}</div>
-        <div class="feeling-desc">${dim.desc}</div>
+        ${val ? `<div class="feeling-val" style="color:${PIP_COLORS[val]}">${val}/10</div>` : ''}
       </div>
+      <div class="feeling-desc">${dim.desc}</div>
       <div class="feeling-scale">${pips}</div>
     </div>`;
   };
