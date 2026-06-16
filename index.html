@@ -666,12 +666,21 @@ async function stGet(dateStr) {
 
 async function stSet(dateStr, val) {
   try {
-    const r = await fetch(`${SUPA_URL}/rest/v1/entries`, {
+    // Try PATCH first (update existing row)
+    const patch = await fetch(`${SUPA_URL}/rest/v1/entries?entry_date=eq.${dateStr}`, {
+      method: 'PATCH',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ data: val, updated_at: new Date().toISOString() })
+    });
+    if(patch.ok) return true;
+
+    // If no row exists yet, INSERT
+    const post = await fetch(`${SUPA_URL}/rest/v1/entries`, {
       method: 'POST',
-      headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
       body: JSON.stringify({ entry_date: dateStr, data: val, updated_at: new Date().toISOString() })
     });
-    return r.status === 200 || r.status === 201 || r.status === 204;
+    return post.ok;
   } catch(e) { return false; }
 }
 
