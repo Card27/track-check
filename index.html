@@ -136,7 +136,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .stab-name{font-weight:600;font-size:13px}
 .stab-link{font-size:11px;color:var(--blue);margin-top:2px;display:block;text-decoration:none}
 
-.cardio-row{background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:11px 12px;display:flex;align-items:center;gap:10px}
+.cardio-row{background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:border-color .2s}
+.cardio-row.expanded{border-color:var(--green)}
+.cardio-hdr{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer}
+.cardio-body{padding:0 12px 12px;border-top:1px solid var(--border)}
+.cardio-fields{display:grid;gap:8px;margin-top:10px}
 .cardio-check{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;font-size:12px}
 .cardio-check.done{background:var(--green);border-color:var(--green);color:#000}
 .cardio-info{flex:1}
@@ -611,12 +615,12 @@ const DAY_PLAN = {
 };
 
 const CARDIO_TARGETS = {
-  treadmill: {name:'Treadmill', icon:'🏃', target:'30–45 min · 3.0–3.2 mph · 1–2%'},
-  row: {name:'Row Machine', icon:'🚣', target:'12–30 min'},
-  treadmill_light: {name:'Treadmill (Easy)', icon:'🏃', target:'15 min · 3.0 mph · Flat (recovery)'},
-  stairs: {name:'Stair Climber', icon:'🪜', target:'8–20 min'},
-  walk: {name:'Outdoor Walk', icon:'🚶', target:'30–45 min'},
-  lunch_walk: {name:'Lunch Walk', icon:'🚶', target:'20–30 min at work'},
+  treadmill:       {name:'Treadmill',       icon:'🏃', target:'30–45 min · 3.0–3.2 mph · 1–2%',      fields:['duration','speed','incline','distance']},
+  row:             {name:'Row Machine',     icon:'🚣', target:'12–30 min',                            fields:['duration']},
+  treadmill_light: {name:'Treadmill (Easy)',icon:'🏃', target:'15 min · 3.0 mph · Flat (recovery)',  fields:['duration','speed','incline','distance']},
+  stairs:          {name:'Stair Climber',   icon:'🪜', target:'8–20 min',                            fields:['duration']},
+  walk:            {name:'Outdoor Walk',    icon:'🚶', target:'30–45 min',                           fields:['duration','distance']},
+  lunch_walk:      {name:'Lunch Walk',      icon:'🚶', target:'20–30 min at work',                   fields:['duration','distance']},
 };
 
 const MEALS = [
@@ -879,7 +883,7 @@ function renderDash() {
     checkD.setDate(checkD.getDate() - 1);
   }
   document.getElementById('kpi-streak').textContent = streak;
-  document.getElementById('kpi-sessions').textContent = entries.filter(e => e.workout?.cardio && Object.values(e.workout.cardio).some(v=>v)).length;
+  document.getElementById('kpi-sessions').textContent = entries.filter(e => e.workout?.cardio && Object.values(e.workout.cardio).some(v => v && (typeof v==='boolean'?v:v.done))).length;
 
   const weights = entries.filter(e=>e.weight).map(e=>e.weight);
   const startW = weights.length ? Math.max(...weights) : 0;
@@ -1104,12 +1108,34 @@ function renderWorkout() {
   cardioList.innerHTML = toShow.map(cid => {
     const ct = CARDIO_TARGETS[cid];
     if(!ct) return '';
-    const done = currentEntry.workout.cardio[cid];
-    return `<div class="cardio-row">
-      <div class="cardio-check${done?' done':''}" onclick="toggleCardio('${cid}')">${done?'✓':''}</div>
-      <div class="cardio-info">
-        <div class="cardio-name">${ct.icon} ${ct.name}</div>
-        <div class="cardio-target">${ct.target}</div>
+    let raw = currentEntry.workout.cardio[cid];
+    if(raw === true) raw = {done:true};
+    const d = (raw && typeof raw === 'object') ? raw : {};
+    const done = !!d.done;
+    const isExp = !!d._expanded;
+    const summary = (done && d.duration)
+      ? [d.duration&&`${d.duration}m`, d.speed&&`${d.speed}mph`, (d.incline!=null&&d.incline!=='')&&`${d.incline}%`, d.distance&&`${d.distance}mi`].filter(Boolean).join(' · ')
+      : ct.target;
+    const cols = ct.fields.length === 1 ? '1fr' : ct.fields.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr 1fr';
+    const fieldHtml = {
+      duration: `<div class="ex-field"><label>MIN</label><input id="cardio-dur-${cid}" type="number" inputmode="numeric" step="1" value="${d.duration??''}" placeholder="30" onchange="updateCardio('${cid}','duration',this.value)" oninput="calcCardioDist('${cid}')"></div>`,
+      speed:    `<div class="ex-field"><label>MPH</label><input id="cardio-spd-${cid}" type="number" inputmode="decimal" step="0.1" value="${d.speed??''}" placeholder="3.0" onchange="updateCardio('${cid}','speed',this.value)" oninput="calcCardioDist('${cid}')"></div>`,
+      incline:  `<div class="ex-field"><label>INCL%</label><input type="number" inputmode="decimal" step="0.5" value="${d.incline??''}" placeholder="1" onchange="updateCardio('${cid}','incline',this.value)"></div>`,
+      distance: `<div class="ex-field"><label>MI</label><input id="cardio-dist-${cid}" type="number" inputmode="decimal" step="0.01" value="${d.distance??''}" placeholder="1.75" onchange="updateCardio('${cid}','distance',this.value)"></div>`,
+    };
+    return `<div class="cardio-row${isExp?' expanded':''}" id="cardio-row-${cid}">
+      <div class="cardio-hdr" onclick="toggleCardioExpand('${cid}')">
+        <div class="cardio-check${done?' done':''}" onclick="event.stopPropagation();toggleCardio('${cid}')">${done?'✓':''}</div>
+        <div class="cardio-info">
+          <div class="cardio-name">${ct.icon} ${ct.name}</div>
+          <div class="cardio-target">${summary}</div>
+        </div>
+        <div class="cardio-chevron" style="color:var(--dim);font-size:11px">${isExp?'▲':'▼'}</div>
+      </div>
+      <div class="cardio-body" style="display:${isExp?'block':'none'}">
+        <div class="cardio-fields" style="grid-template-columns:${cols}">
+          ${ct.fields.map(f=>fieldHtml[f]).join('')}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1139,8 +1165,55 @@ function updateExAllReps(exId, checked) {
 }
 
 function toggleCardio(cid) {
-  currentEntry.workout.cardio[cid] = !currentEntry.workout.cardio[cid];
-  renderWorkout();
+  let raw = currentEntry.workout.cardio[cid];
+  if(!raw || typeof raw === 'boolean') raw = {done:!!raw, _expanded:true};
+  raw.done = !raw.done;
+  currentEntry.workout.cardio[cid] = raw;
+  const check = document.querySelector(`#cardio-row-${cid} .cardio-check`);
+  if(check) { check.className='cardio-check'+(raw.done?' done':''); check.textContent=raw.done?'✓':''; }
+  saveToday(true);
+}
+
+function toggleCardioExpand(cid) {
+  let raw = currentEntry.workout.cardio[cid];
+  if(!raw || typeof raw === 'boolean') raw = {done:!!raw};
+  raw._expanded = !raw._expanded;
+  currentEntry.workout.cardio[cid] = raw;
+  const row = document.getElementById('cardio-row-'+cid);
+  if(!row) return;
+  row.className = 'cardio-row'+(raw._expanded?' expanded':'');
+  const body = row.querySelector('.cardio-body');
+  if(body) body.style.display = raw._expanded ? 'block' : 'none';
+  const chevron = row.querySelector('.cardio-chevron');
+  if(chevron) chevron.textContent = raw._expanded ? '▲' : '▼';
+}
+
+function updateCardio(cid, field, val) {
+  let raw = currentEntry.workout.cardio[cid];
+  if(!raw || typeof raw === 'boolean') raw = {done:!!raw, _expanded:true};
+  const parsed = parseFloat(val);
+  raw[field] = isNaN(parsed) ? null : parsed;
+  if(field === 'duration' && parsed > 0) {
+    raw.done = true;
+    const check = document.querySelector(`#cardio-row-${cid} .cardio-check`);
+    if(check) { check.className='cardio-check done'; check.textContent='✓'; }
+  }
+  currentEntry.workout.cardio[cid] = raw;
+  saveToday(true);
+}
+
+function calcCardioDist(cid) {
+  const dur = parseFloat(document.getElementById('cardio-dur-'+cid)?.value);
+  const spd = parseFloat(document.getElementById('cardio-spd-'+cid)?.value);
+  if(!isNaN(dur) && !isNaN(spd) && dur > 0 && spd > 0) {
+    const dist = Math.round(dur / 60 * spd * 100) / 100;
+    const el = document.getElementById('cardio-dist-'+cid);
+    if(el) el.value = dist;
+    let raw = currentEntry.workout.cardio[cid];
+    if(!raw || typeof raw === 'boolean') raw = {done:!!raw, _expanded:true};
+    raw.distance = dist;
+    currentEntry.workout.cardio[cid] = raw;
+  }
 }
 
 function toggleStab(id) {
