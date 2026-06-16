@@ -303,6 +303,13 @@ select:focus{outline:none;border-color:var(--amber)}
 .feeling-scale{display:flex;gap:3px;width:100%}
 .f-pip{flex:1;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--s3);color:var(--dim);transition:all .15s;user-select:none;-webkit-user-select:none}
 .feeling-num-row{display:flex;gap:12px;margin-top:8px}
+.log-feeling-btn{width:100%;padding:13px;background:var(--amber);color:#fff;border:none;border-radius:8px;font-family:var(--font-display);font-size:16px;letter-spacing:2px;cursor:pointer;margin-top:4px;transition:opacity .15s}
+.log-feeling-btn:active{opacity:.75}
+.feeling-hist-entry{padding:10px 0;border-bottom:1px solid var(--faint)}
+.feeling-hist-entry:last-child{border-bottom:none}
+.feeling-hist-time{font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-bottom:5px}
+.feeling-hist-scores{display:flex;flex-wrap:wrap;gap:5px}
+.feeling-hist-score{font-family:var(--font-mono);font-size:10px;padding:2px 6px;border-radius:3px;background:var(--s3)}
 </style>
 </head>
 <body>
@@ -607,15 +614,6 @@ const STAB_EXERCISES = [
   {id:'forearm_plank',        name:'Forearm Plank',         url:'https://www.youtube.com/watch?v=gSDNblPRh1U', minWeek:4},
 ];
 
-const ENERGY_BTNS = [
-  {level:1, tag:'crashed',  emoji:'😴', label:'CRASHED',   color:'var(--red)'},
-  {level:2, tag:'brainfog', emoji:'🌫️', label:'BRAIN FOG',  color:'var(--purple)'},
-  {level:2, tag:'tired',    emoji:'😑', label:'TIRED',      color:'var(--amber)'},
-  {level:3, tag:'normal',   emoji:'😐', label:'NORMAL',     color:'var(--dim)'},
-  {level:4, tag:'focused',  emoji:'😊', label:'FOCUSED',    color:'var(--blue)'},
-  {level:5, tag:'high',     emoji:'⚡', label:'HIGH',       color:'var(--green)'},
-];
-
 const FEELING_DIMS = [
   {key:'mental',   label:'MENTAL',   desc:'mood · anxiety · depression',  section:'daily'},
   {key:'physical', label:'PHYSICAL', desc:'general body feeling',          section:'daily'},
@@ -701,6 +699,7 @@ let todayStr = TODAY.getFullYear() + '-' + String(TODAY.getMonth()+1).padStart(2
 let currentEntry = defaultEntry();
 let allHistory = {};
 let currentSection = 'workout';
+let feelingDraft = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null,sleep:null,stiffness:null,subluxations:null,notes:''};
 
 function defaultEntry() {
   return {
@@ -711,7 +710,7 @@ function defaultEntry() {
     meds: {},
     water: { total:0, log:[] },
     flare: { status:'good', triggers:[], notes:'' },
-    feeling: { mental:null, physical:null, gut:null, energy:null, clarity:null, stress:null, sleep:null, morningStiffness:null, subluxations:null, logs:[], notes:'' }
+    feeling: { logs: [] }
   };
 }
 
@@ -836,6 +835,9 @@ async function init() {
   const saved = allHistory[todayStr] || await stGet(todayStr);
   if(saved) currentEntry = saved;
   else currentEntry = defaultEntry();
+
+  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+  if(!Array.isArray(currentEntry.feeling.logs)) currentEntry.feeling.logs = [];
 
   renderAll();
 }
@@ -969,25 +971,24 @@ function renderDash() {
   });
   document.getElementById('weekGlance').innerHTML = weekHtml;
 
-  // Energy today card
-  const eLogs = currentEntry.feeling?.logs || currentEntry.energy?.logs || [];
+  // Feeling today card
+  const eLogs = currentEntry.feeling?.logs || [];
   const eSorted = [...eLogs].sort((a,b) => b.time - a.time);
   const eLatest = eSorted[0];
   let energyDashHtml = '';
   if(eLogs.length === 0) {
     energyDashHtml = '<div class="empty-state" style="padding:8px">Tap FEELING tab to start tracking</div>';
   } else {
-    const m = energyMeta(eLatest.tag);
-    energyDashHtml = '';
-    if(eLogs.length >= 2) {
-      energyDashHtml += `<div class="mini-chart" style="height:50px;margin-bottom:10px">${energyMiniChart(eLogs)}</div>`;
-    }
-    energyDashHtml += `<div style="display:flex;align-items:center;gap:10px">
-      <div style="font-size:32px">${m.emoji}</div>
-      <div>
-        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1.5px;color:${m.color}">${m.label}</div>
-        <div style="font-size:10px;color:var(--dim);margin-top:1px">${fmtTime(eLatest.time)} · ${eLogs.length} entr${eLogs.length===1?'y':'ies'} today</div>
-      </div>
+    const dims = FEELING_DIMS.slice(0,4);
+    const scoreChips = dims.map(d => {
+      const v = eLatest[d.key];
+      if(!v && v !== 0) return '';
+      const c = PIP_COLORS[Math.min(10,Math.max(1,Math.round(v)))];
+      return `<span style="font-family:var(--font-mono);font-size:10px;color:${c};margin-right:8px">${d.label} <strong>${v}</strong></span>`;
+    }).filter(Boolean).join('');
+    energyDashHtml = `<div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px">${scoreChips}</div>
+      <div style="font-size:10px;color:var(--dim)">${fmtTime(eLatest.time)} · ${eLogs.length} entr${eLogs.length===1?'y':'ies'} today</div>
     </div>`;
   }
   document.getElementById('energyDashBody').innerHTML = energyDashHtml;
@@ -1600,55 +1601,47 @@ function renderWeekPage() {
       </svg>`;
   }
 
-  // Energy trends
+  // Energy trends (uses log.energy 1-10 from feeling logs)
   const HOUR_BUCKETS = [4,6,8,10,12,14,16,18,20];
   const BUCKET_LABELS = {4:'4AM',6:'6AM',8:'8AM',10:'10AM',12:'12PM',14:'2PM',16:'4PM',18:'6PM',20:'8PM'};
   const bucketData = {};
-  HOUR_BUCKETS.forEach(h => { bucketData[h] = {levels:[], fogCount:0}; });
+  HOUR_BUCKETS.forEach(h => { bucketData[h] = []; });
 
   Object.values(allHistory).forEach(entry => {
-    (entry.feeling?.logs || entry.energy?.logs || []).forEach(log => {
+    (entry.feeling?.logs || []).forEach(log => {
+      if(log.energy == null) return;
       const hour = new Date(log.time).getHours();
       HOUR_BUCKETS.forEach(h => {
-        if(hour >= h && hour < h + 2) {
-          bucketData[h].levels.push(log.level);
-          if(log.tag === 'brainfog') bucketData[h].fogCount++;
-        }
+        if(hour >= h && hour < h + 2) bucketData[h].push(log.energy);
       });
     });
   });
 
-  const activeBuckets = HOUR_BUCKETS.filter(h => bucketData[h].levels.length > 0);
+  const activeBuckets = HOUR_BUCKETS.filter(h => bucketData[h].length > 0);
   let energyTrendHtml = '';
   if(activeBuckets.length === 0) {
-    energyTrendHtml = '<div class="empty-state">No energy data yet. Start logging in the ENERGY tab.</div>';
+    energyTrendHtml = '<div class="empty-state">No feeling data yet. Log in the FEELING tab.</div>';
   } else {
-    const avgOf = h => bucketData[h].levels.reduce((s,v)=>s+v,0) / bucketData[h].levels.length;
-    const barColor = avg => avg >= 4 ? 'var(--green)' : avg >= 3 ? 'var(--blue)' : avg >= 2.5 ? 'var(--dim)' : avg >= 2 ? 'var(--amber)' : 'var(--red)';
+    const avgOf = h => bucketData[h].reduce((s,v)=>s+v,0) / bucketData[h].length;
+    const barColor = avg => avg >= 8 ? 'var(--green)' : avg >= 6 ? 'var(--blue)' : avg >= 4 ? 'var(--dim)' : avg >= 2 ? 'var(--amber)' : 'var(--red)';
 
     energyTrendHtml = activeBuckets.map(h => {
       const avg = avgOf(h);
-      const pct = ((avg - 1) / 4) * 100;
-      const fog = bucketData[h].fogCount;
+      const pct = ((avg - 1) / 9) * 100;
       return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--faint)">
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);min-width:38px">${BUCKET_LABELS[h]}</div>
         <div style="flex:1;background:var(--s3);border-radius:4px;height:8px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:${barColor(avg)};border-radius:4px;transition:width .4s"></div>
         </div>
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);min-width:28px">${avg.toFixed(1)}</div>
-        ${fog > 1 ? '<div style="font-size:11px" title="Brain fog logged here">🌫️</div>' : '<div style="min-width:16px"></div>'}
       </div>`;
     }).join('');
 
     const avgs = activeBuckets.map(h => ({h, avg: avgOf(h)}));
     const peak = avgs.reduce((a,b) => b.avg > a.avg ? b : a);
     const low  = avgs.reduce((a,b) => b.avg < a.avg ? b : a);
-    const mostFogBucket = activeBuckets.reduce((a,b) => bucketData[b].fogCount > bucketData[a].fogCount ? b : a);
-    const mostFogCount = bucketData[mostFogBucket].fogCount;
-
-    let insight = `Peak energy: ${BUCKET_LABELS[peak.h]} avg ${peak.avg.toFixed(1)}`;
-    if(low.h !== peak.h) insight += ` · Lowest: ${BUCKET_LABELS[low.h]} avg ${low.avg.toFixed(1)}`;
-    if(mostFogCount > 0) insight += ` · Most fog: ${BUCKET_LABELS[mostFogBucket]} (${mostFogCount})`;
+    let insight = `Peak energy: ${BUCKET_LABELS[peak.h]} avg ${peak.avg.toFixed(1)}/10`;
+    if(low.h !== peak.h) insight += ` · Lowest: ${BUCKET_LABELS[low.h]} avg ${low.avg.toFixed(1)}/10`;
     energyTrendHtml += `<div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-top:8px;line-height:1.5">${insight}</div>`;
   }
 
@@ -1674,56 +1667,11 @@ function renderWeekPage() {
       }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
-// ENERGY
-// ═══════════════════════════════════════════════════════
-
-function energyMeta(tag) {
-  return ENERGY_BTNS.find(b => b.tag === tag) || {emoji:'😐', label:'NORMAL', color:'var(--dim)', level:3};
-}
-
-function energyMiniChart(logs, W=300, H=60) {
-  if(!logs || logs.length < 2) return '';
-  const colorMap = {crashed:'var(--red)',brainfog:'var(--purple)',tired:'var(--amber)',normal:'var(--dim)',focused:'var(--blue)',high:'var(--green)'};
-  const sorted = [...logs].sort((a,b)=>a.time-b.time);
-  const xMin = sorted[0].time, xMax = sorted[sorted.length-1].time;
-  const xRange = Math.max(xMax - xMin, 1);
-  const xp = t => 10 + ((t - xMin) / xRange) * (W - 20);
-  const yp = v => H - 6 - ((v - 1) / 4) * (H - 12);
-  const pts = sorted.map(e => `${xp(e.time)},${yp(e.level)}`).join(' ');
-  const dots = sorted.map(e => `<circle cx="${xp(e.time)}" cy="${yp(e.level)}" r="4" fill="${colorMap[e.tag]||'var(--dim)'}" stroke="var(--bg)" stroke-width="1.5"/>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%">
-    <polyline points="${pts}" fill="none" stroke="var(--border2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    ${dots}
-  </svg>`;
-}
-
-function logEnergy(level, tag) {
-  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
-  if(!currentEntry.feeling.logs) currentEntry.feeling.logs = [];
-  currentEntry.feeling.logs.push({time: Date.now(), level, tag});
-  saveToday(true);
-  renderFeeling();
-  renderDash();
-}
-
-function deleteEnergyLog(idx) {
-  const logs = currentEntry.feeling?.logs || currentEntry.energy?.logs;
-  if(!logs) return;
-  logs.splice(idx, 1);
-  saveToday(true);
-  renderFeeling();
-  renderDash();
-}
-
 function renderFeeling() {
-  const f = currentEntry.feeling || {};
-  const logs = f.logs || currentEntry.energy?.logs || [];
-  const sorted = [...logs].sort((a,b) => b.time - a.time);
+  const logs = (currentEntry.feeling?.logs || []).slice().sort((a,b) => b.time - a.time);
 
-  // ── 1-5 scale rows ──
   const pipRow = (dim) => {
-    const val = f[dim.key];
+    const val = feelingDraft[dim.key];
     const pips = [1,2,3,4,5,6,7,8,9,10].map(n => {
       const active = val === n;
       const style = active ? `background:${PIP_COLORS[n]};border-color:${PIP_COLORS[n]};color:#fff` : '';
@@ -1742,42 +1690,39 @@ function renderFeeling() {
   const dailyRows = FEELING_DIMS.filter(d=>d.section==='daily').map(pipRow).join('');
   const extraRows = FEELING_DIMS.filter(d=>d.section==='extra').map(pipRow).join('');
 
-  // ── Condition-specific ──
-  const stiff = f.morningStiffness ?? '';
-  const subx  = f.subluxations   ?? '';
+  const stiff = feelingDraft.stiffness ?? '';
+  const subx  = feelingDraft.subluxations ?? '';
   const condHtml = `
     <div class="feeling-num-row">
       <div class="ex-field" style="flex:1"><label>MORNING STIFFNESS (min)</label>
         <input type="number" inputmode="numeric" step="1" value="${stiff}" placeholder="0"
-               onchange="updateFeelingField('morningStiffness',this.value)"></div>
+               onchange="updateFeelingField('stiffness',this.value)"></div>
       <div class="ex-field" style="flex:1"><label>SUBLUXATIONS TODAY</label>
         <input type="number" inputmode="numeric" step="1" value="${subx}" placeholder="0"
                onchange="updateFeelingField('subluxations',this.value)"></div>
     </div>`;
 
-  // ── Energy log ──
-  const btnHtml = ENERGY_BTNS.map(b =>
-    `<div class="energy-btn" onclick="logEnergy(${b.level},'${b.tag}')">
-      <div class="energy-btn-emoji">${b.emoji}</div>
-      <div class="energy-btn-label" style="color:${b.color}">${b.label}</div>
-    </div>`).join('');
-
-  const logHtml = sorted.length === 0
-    ? '<div class="empty-state" style="padding:10px">Tap a button above to log energy state</div>'
-    : sorted.map(e => {
-        const realIdx = logs.findIndex(l => l.time === e.time && l.tag === e.tag);
-        const meta = energyMeta(e.tag);
-        return `<div class="energy-log-entry">
-          <div class="energy-log-time">${fmtTime(e.time)}</div>
-          <div style="font-size:16px">${meta.emoji}</div>
-          <div style="font-weight:600;color:${meta.color};font-size:12px">${meta.label}</div>
-          <div class="energy-log-del" onclick="deleteEnergyLog(${realIdx})">×</div>
+  const histHtml = logs.length === 0
+    ? '<div class="empty-state" style="padding:8px 0">No logs yet today</div>'
+    : logs.map((e, i) => {
+        const realIdx = currentEntry.feeling.logs.findIndex(l => l.time === e.time);
+        const scores = FEELING_DIMS.map(d => {
+          const v = e[d.key];
+          if(!v && v !== 0) return '';
+          return `<span class="feeling-hist-score" style="color:${PIP_COLORS[Math.min(10,Math.max(1,Math.round(v)))]}">${d.label} ${v}</span>`;
+        }).filter(Boolean);
+        const stiffStr = (e.stiffness != null && e.stiffness !== '') ? `<span class="feeling-hist-score">STIFF ${e.stiffness}m</span>` : '';
+        const subxStr  = (e.subluxations != null && e.subluxations !== '') ? `<span class="feeling-hist-score">SUBX ${e.subluxations}</span>` : '';
+        const noteStr  = e.notes ? `<div style="font-size:10px;color:var(--dim);margin-top:4px">${e.notes}</div>` : '';
+        return `<div class="feeling-hist-entry">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="feeling-hist-time">${fmtTime(e.time)}</div>
+            <div class="energy-log-del" onclick="deleteFeelingLog(${realIdx})">×</div>
+          </div>
+          <div class="feeling-hist-scores">${scores.join('')}${stiffStr}${subxStr}</div>
+          ${noteStr}
         </div>`;
       }).join('');
-
-  const chartHtml = logs.length >= 2
-    ? `<div class="mini-chart" style="height:55px;margin-bottom:10px">${energyMiniChart(logs)}</div>`
-    : '';
 
   document.getElementById('section-feeling').innerHTML = `
     <div class="card">
@@ -1793,33 +1738,48 @@ function renderFeeling() {
       <div class="card-body">${condHtml}</div>
     </div>
     <div class="card">
-      <div class="card-hdr"><div class="card-icon">⚡</div><div class="card-title">ENERGY LOG</div></div>
+      <div class="card-hdr"><div class="card-icon">📝</div><div class="card-title">NOTES</div></div>
       <div class="card-body">
-        <div class="energy-btn-grid">${btnHtml}</div>
-        ${chartHtml}
-        ${logHtml}
+        <textarea class="notes-area" id="feelingNotes" placeholder="How are you feeling overall today?">${feelingDraft.notes||''}</textarea>
       </div>
     </div>
+    <div class="card-body" style="padding-top:0">
+      <button class="log-feeling-btn" onclick="logFeeling()">LOG FEELING</button>
+    </div>
     <div class="card">
-      <div class="card-hdr"><div class="card-icon">📝</div><div class="card-title">DAILY NOTES</div></div>
-      <div class="card-body">
-        <textarea class="notes-area" id="feelingNotes" placeholder="How are you feeling overall today?">${f.notes||''}</textarea>
-      </div>
+      <div class="card-hdr"><div class="card-icon">🕐</div><div class="card-title">TODAY'S LOG</div></div>
+      <div class="card-body">${histHtml}</div>
     </div>`;
 }
 
 function setFeeling(key, val) {
-  if(!currentEntry.feeling) currentEntry.feeling = {};
-  currentEntry.feeling[key] = currentEntry.feeling[key] === val ? null : val;
-  saveToday(true);
+  feelingDraft[key] = feelingDraft[key] === val ? null : val;
   renderFeeling();
 }
 
 function updateFeelingField(key, val) {
-  if(!currentEntry.feeling) currentEntry.feeling = {};
   const parsed = parseFloat(val);
-  currentEntry.feeling[key] = isNaN(parsed) ? null : parsed;
+  feelingDraft[key] = isNaN(parsed) ? null : parsed;
+}
+
+function logFeeling() {
+  feelingDraft.notes = document.getElementById('feelingNotes')?.value || '';
+  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+  if(!currentEntry.feeling.logs) currentEntry.feeling.logs = [];
+  currentEntry.feeling.logs.push({time: Date.now(), ...feelingDraft});
+  feelingDraft = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null,sleep:null,stiffness:null,subluxations:null,notes:''};
   saveToday(true);
+  showToast('FEELING LOGGED ✓');
+  renderFeeling();
+  renderDash();
+}
+
+function deleteFeelingLog(idx) {
+  if(!currentEntry.feeling?.logs) return;
+  currentEntry.feeling.logs.splice(idx, 1);
+  saveToday(true);
+  renderFeeling();
+  renderDash();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1829,8 +1789,7 @@ function updateFeelingField(key, val) {
 async function saveToday(silent=false) {
   currentEntry.workout.notes = document.getElementById('workoutNotes')?.value || '';
   currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
-  currentEntry.feeling = currentEntry.feeling || {};
-  currentEntry.feeling.notes = document.getElementById('feelingNotes')?.value || (currentEntry.feeling.notes || '');
+  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
 
   const ok = await stSet(todayStr, currentEntry);
   if(ok) {
