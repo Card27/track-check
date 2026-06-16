@@ -346,18 +346,18 @@ select:focus{outline:none;border-color:var(--amber)}
 
       <div class="card">
         <div class="card-hdr">
+          <div class="card-icon">⚡</div>
+          <div class="card-title">ENERGY PATTERN</div>
+        </div>
+        <div class="card-body" id="energyPatternBody"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
           <div class="card-icon">📋</div>
           <div class="card-title">TODAY AT A GLANCE</div>
         </div>
         <div class="card-body" id="todayGlance"></div>
-      </div>
-
-      <div class="card" id="energyDashCard">
-        <div class="card-hdr">
-          <div class="card-icon">⚡</div>
-          <div class="card-title">ENERGY TODAY</div>
-        </div>
-        <div class="card-body" id="energyDashBody"></div>
       </div>
 
       <div class="card">
@@ -670,7 +670,7 @@ const MEDS = [
 // ═══════════════════════════════════════════════════════
 
 const TODAY = new Date();
-let todayStr = TODAY.toISOString().split('T')[0];
+let todayStr = `${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}`;
 let currentEntry = defaultEntry();
 let allHistory = {};
 let currentSection = 'workout';
@@ -758,8 +758,11 @@ function getWeekDays() {
   const days = [];
   const dow = TODAY.getDay();
   for(let i = 0; i < 7; i++) {
-    const d = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - dow + i);
-    days.push(d.toISOString().split('T')[0]);
+    const day = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - dow + i);
+    const yyyy = day.getFullYear();
+    const mm = String(day.getMonth() + 1).padStart(2, '0');
+    const dd = String(day.getDate()).padStart(2, '0');
+    days.push(`${yyyy}-${mm}-${dd}`);
   }
   return days;
 }
@@ -836,7 +839,7 @@ function updateHeader() {
 }
 
 function renderAll() {
-  renderDash();
+  renderDash();        // also calls renderEnergyPattern()
   renderWorkout();
   renderFood();
   renderMeds();
@@ -948,28 +951,7 @@ function renderDash() {
   });
   document.getElementById('weekGlance').innerHTML = weekHtml;
 
-  // Energy today card
-  const eLogs = currentEntry.energy?.logs || [];
-  const eSorted = [...eLogs].sort((a,b) => b.time - a.time);
-  const eLatest = eSorted[0];
-  let energyDashHtml = '';
-  if(eLogs.length === 0) {
-    energyDashHtml = '<div class="empty-state" style="padding:8px">Tap ENERGY tab to start tracking</div>';
-  } else {
-    const m = energyMeta(eLatest.tag);
-    energyDashHtml = '';
-    if(eLogs.length >= 2) {
-      energyDashHtml += `<div class="mini-chart" style="height:50px;margin-bottom:10px">${energyMiniChart(eLogs)}</div>`;
-    }
-    energyDashHtml += `<div style="display:flex;align-items:center;gap:10px">
-      <div style="font-size:32px">${m.emoji}</div>
-      <div>
-        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1.5px;color:${m.color}">${m.label}</div>
-        <div style="font-size:10px;color:var(--dim);margin-top:1px">${fmtTime(eLatest.time)} · ${eLogs.length} entr${eLogs.length===1?'y':'ies'} today</div>
-      </div>
-    </div>`;
-  }
-  document.getElementById('energyDashBody').innerHTML = energyDashHtml;
+  renderEnergyPattern();
 }
 
 function calcTodayCals() {
@@ -1582,6 +1564,76 @@ function renderWeekPage() {
           </div>
         </div>`;
       }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// ENERGY PATTERN (dashboard — all-history avg by hour)
+// ═══════════════════════════════════════════════════════
+
+function renderEnergyPattern() {
+  const allLogs = [];
+  Object.values(allHistory).forEach(e => (e.energy?.logs||[]).forEach(l => allLogs.push(l)));
+  (currentEntry.energy?.logs||[]).forEach(l => allLogs.push(l));
+
+  const el = document.getElementById('energyPatternBody');
+  if(!el) return;
+  if(allLogs.length < 3) {
+    el.innerHTML = '<div class="empty-state" style="padding:12px">Log energy for a few days to see your daily pattern</div>';
+    return;
+  }
+
+  // Group by local hour
+  const hd = {};
+  allLogs.forEach(l => {
+    const h = new Date(l.time).getHours();
+    if(!hd[h]) hd[h] = {levels:[], fog:0, tags:{}};
+    hd[h].levels.push(l.level);
+    if(l.tag === 'brainfog') hd[h].fog++;
+    hd[h].tags[l.tag] = (hd[h].tags[l.tag]||0) + 1;
+  });
+
+  const hours = Object.keys(hd).map(Number).sort((a,b) => a-b);
+  const avg = h => hd[h].levels.reduce((s,v) => s+v, 0) / hd[h].levels.length;
+  const dotColor = a => a>=4.2?'var(--green)':a>=3.5?'var(--blue)':a>3?'var(--dim)':a>2?'var(--amber)':'var(--red)';
+  const hLabel = h => h===0?'12A':h<12?`${h}A`:h===12?'12P':`${h-12}P`;
+
+  const W=300, H=80, PL=12, PR=12, PT=18, PB=18;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const xMin=hours[0], xMax=hours[hours.length-1], xR=Math.max(xMax-xMin,1);
+  const xp = h => (PL + ((h-xMin)/xR)*cW).toFixed(1);
+  const yp = v => (PT + cH - ((v-1)/4)*cH).toFixed(1);
+
+  const pts = hours.map(h => `${xp(h)},${yp(avg(h))}`).join(' ');
+
+  const dots = hours.map(h => {
+    const a = avg(h);
+    const cx = xp(h), cy = yp(a);
+    const topTag = Object.entries(hd[h].tags).reduce((a,b) => b[1]>a[1]?b:a)[0];
+    // Small purple circle above dot = brain fog marker
+    const fogMark = topTag==='brainfog'
+      ? `<circle cx="${cx}" cy="${(parseFloat(cy)-11).toFixed(1)}" r="2.5" fill="var(--purple)" opacity=".75"/>`
+      : '';
+    return `${fogMark}
+      <circle cx="${cx}" cy="${cy}" r="4.5" fill="${dotColor(a)}" stroke="var(--bg)" stroke-width="1.5"/>
+      <text x="${cx}" y="${H-1}" text-anchor="middle" font-size="7.5" fill="var(--dim)">${hLabel(h)}</text>`;
+  }).join('');
+
+  // Insight line
+  const avgs = hours.map(h => ({h, a:avg(h)}));
+  const peak = avgs.reduce((a,b) => b.a>a.a?b:a);
+  const low  = avgs.reduce((a,b) => b.a<a.a?b:a);
+  const fogH = hours.reduce((a,b) => hd[b].fog>hd[a].fog?b:a);
+  let insight = `Peak avg: ${hLabel(peak.h)} (${peak.a.toFixed(1)})`;
+  if(low.h !== peak.h) insight += ` · Lowest: ${hLabel(low.h)} (${low.a.toFixed(1)})`;
+  if(hd[fogH].fog > 0) insight += ` · Most fog: ${hLabel(fogH)}`;
+
+  el.innerHTML = `<div style="height:${H}px">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%">
+      <polyline points="${pts}" fill="none" stroke="var(--border2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+    </svg>
+  </div>
+  <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-top:4px;line-height:1.5">${insight}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════
