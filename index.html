@@ -282,6 +282,16 @@ select:focus{outline:none;border-color:var(--amber)}
 .mini-chart{height:60px;position:relative;margin-top:8px}
 .mini-chart svg{width:100%;height:100%}
 
+/* DAY VIEW */
+.dayview-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.dayview-back{background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-family:var(--font-display);font-size:13px;letter-spacing:1px;cursor:pointer;flex-shrink:0}
+.dayview-back:hover{border-color:var(--dim)}
+.dayview-title{flex:1}
+.dayview-title-main{font-family:var(--font-display);font-size:20px;letter-spacing:2px}
+.dayview-title-sub{font-size:11px;color:var(--dim);margin-top:1px}
+.dayview-edit{background:var(--amber-glow2);border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:8px 16px;font-family:var(--font-display);font-size:13px;letter-spacing:1px;cursor:pointer;flex-shrink:0}
+.dayview-edit:hover{background:var(--amber);color:#080810}
+
 /* ENERGY */
 .energy-btn-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
 .energy-btn{border-radius:10px;border:1px solid var(--border);background:var(--s2);padding:16px 10px;text-align:center;cursor:pointer;transition:all .15s}
@@ -412,7 +422,7 @@ select:focus{outline:none;border-color:var(--amber)}
         <div id="exerciseList"></div>
         <div id="cardioList"></div>
         <textarea class="notes-area" id="workoutNotes" placeholder="Workout notes — how did it feel? Any joint issues?"></textarea>
-        <button class="save-btn" style="margin-top:10px" onclick="saveToday()">SAVE WORKOUT</button>
+        <button class="save-btn" style="margin-top:10px" onclick="saveSection('workout')">SAVE WORKOUT</button>
       </div>
 
       <!-- FOOD SECTION -->
@@ -429,13 +439,13 @@ select:focus{outline:none;border-color:var(--amber)}
             <div class="cheat-grid" id="cheatGrid"></div>
           </div>
         </div>
-        <button class="save-btn" onclick="saveToday()">SAVE FOOD LOG</button>
+        <button class="save-btn" onclick="saveSection('food')">SAVE FOOD LOG</button>
       </div>
 
       <!-- MEDS SECTION -->
       <div id="section-meds" style="display:none">
         <div id="medList"></div>
-        <button class="save-btn" onclick="saveToday()">SAVE MEDS</button>
+        <button class="save-btn" onclick="saveSection('meds')">SAVE MEDS</button>
       </div>
 
       <!-- WATER SECTION -->
@@ -492,11 +502,16 @@ select:focus{outline:none;border-color:var(--amber)}
             <textarea class="notes-area" id="flareNotes" placeholder="Any observations — joint locations, severity, what helps..."></textarea>
           </div>
         </div>
-        <button class="save-btn" onclick="saveToday()">SAVE FLARE LOG</button>
+        <button class="save-btn" onclick="saveSection('flare')">SAVE FLARE LOG</button>
       </div>
 
       <!-- ENERGY SECTION -->
       <div id="section-feeling" style="display:none"></div>
+    </div>
+
+    <!-- DAY VIEW -->
+    <div class="page" id="page-dayview">
+      <div id="dayViewContent"></div>
     </div>
 
     <!-- WEEK -->
@@ -700,6 +715,8 @@ let currentEntry = defaultEntry();
 let allHistory = {};
 let currentSection = 'workout';
 let feelingDraft = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null,sleep:null,stiffness:null,subluxations:null,notes:''};
+let viewingDate = null;
+let viewEntry = null;
 
 function defaultEntry() {
   return {
@@ -726,44 +743,141 @@ const SUPA_HEADERS = {
   'Authorization': 'Bearer ' + SUPA_KEY
 };
 
-async function stGet(dateStr) {
+// ── USER IDENTITY (single-user, no auth) ──────────────
+// UUID generated once, stored in localStorage.
+// On first run, a row is auto-created in the users table.
+// If RLS blocks inserts, run in Supabase SQL editor:
+//   ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE workout_logs DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE feeling_logs DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE food_logs DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE supplement_logs DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE water_logs DISABLE ROW LEVEL SECURITY;
+//   ALTER TABLE flare_logs DISABLE ROW LEVEL SECURITY;
+function genUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+let USER_ID = localStorage.getItem('lt_user_id');
+if (!USER_ID) { USER_ID = genUUID(); localStorage.setItem('lt_user_id', USER_ID); }
+
+async function ensureUser() {
   try {
-    const r = await fetch(`${SUPA_URL}/rest/v1/entries?entry_date=eq.${dateStr}&select=data`, {
-      headers: SUPA_HEADERS
-    });
+    const r = await fetch(`${SUPA_URL}/rest/v1/users?id=eq.${USER_ID}&select=id`, { headers: SUPA_HEADERS });
     const rows = await r.json();
-    return rows.length ? rows[0].data : null;
-  } catch(e) { return null; }
+    if (!rows.length) {
+      await fetch(`${SUPA_URL}/rest/v1/users`, {
+        method: 'POST',
+        headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ id: USER_ID, email: '' })
+      });
+    }
+  } catch(e) {}
 }
 
-async function stSet(dateStr, val) {
+async function supaFetch(table, params = '') {
   try {
-    // Try PATCH first (update existing row)
-    const patch = await fetch(`${SUPA_URL}/rest/v1/entries?entry_date=eq.${dateStr}`, {
-      method: 'PATCH',
-      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ data: val, updated_at: new Date().toISOString() })
-    });
-    if(patch.ok) return true;
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`, { headers: SUPA_HEADERS });
+    return r.ok ? await r.json() : [];
+  } catch(e) { return []; }
+}
 
-    // If no row exists yet, INSERT
-    const post = await fetch(`${SUPA_URL}/rest/v1/entries`, {
+async function supaUpsert(table, data) {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
-      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ entry_date: dateStr, data: val, updated_at: new Date().toISOString() })
+      headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(data)
     });
-    return post.ok;
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ message: r.statusText }));
+      console.error(`[supabase] ${table} upsert failed ${r.status}:`, err);
+      return { ok: false, err: err.message || err.code || r.status };
+    }
+    return { ok: true };
+  } catch(e) { console.error(`[supabase] ${table} upsert error:`, e); return { ok: false, err: e.message }; }
+}
+
+async function supaInsert(table, data) {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=representation' },
+      body: JSON.stringify(data)
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ message: r.statusText }));
+      console.error(`[supabase] ${table} insert failed ${r.status}:`, err);
+      return null;
+    }
+    const rows = await r.json();
+    return rows[0] || null;
+  } catch(e) { console.error(`[supabase] ${table} insert error:`, e); return null; }
+}
+
+async function supaDelete(table, filter) {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`, {
+      method: 'DELETE',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' }
+    });
+    return r.ok;
   } catch(e) { return false; }
+}
+
+function mergeDay(dateStr, w, feelings, f, s, wt, fl) {
+  const entry = defaultEntry();
+  entry.date = dateStr;
+  if (w) entry.workout = { exercises: w.exercises||{}, cardio: w.cardio||{}, stab: w.stabilization||{}, notes: w.notes||'', day_type: w.day_type };
+  if (feelings.length) {
+    entry.feeling.logs = feelings.map(r => ({
+      time: new Date(r.logged_at).getTime(), _id: r.id,
+      mental: r.mental, physical: r.physical, gut: r.gut, energy: r.energy,
+      clarity: r.clarity, stress: r.stress, sleep: r.sleep_quality,
+      stiffness: r.stiffness_minutes, subluxations: r.subluxations, notes: r.notes
+    }));
+  }
+  if (f) entry.food = { meals: f.meals||{}, cheats: f.cheats||{} };
+  if (s) entry.meds = s.supplements||{};
+  if (wt) entry.water = { total: Number(wt.total_oz)||0, log: wt.entries||[] };
+  if (fl) entry.flare = { status: fl.status||'good', triggers: fl.triggers||[], notes: fl.notes||'' };
+  return entry;
+}
+
+async function stLoadDay(dateStr) {
+  const uid = `user_id=eq.${USER_ID}`;
+  const [w, feelings, f, s, wt, fl] = await Promise.all([
+    supaFetch('workout_logs',    `${uid}&log_date=eq.${dateStr}`),
+    supaFetch('feeling_logs',    `${uid}&log_date=eq.${dateStr}&order=logged_at.asc`),
+    supaFetch('food_logs',       `${uid}&log_date=eq.${dateStr}`),
+    supaFetch('supplement_logs', `${uid}&log_date=eq.${dateStr}`),
+    supaFetch('water_logs',      `${uid}&log_date=eq.${dateStr}`),
+    supaFetch('flare_logs',      `${uid}&log_date=eq.${dateStr}`),
+  ]);
+  return mergeDay(dateStr, w[0], feelings, f[0], s[0], wt[0], fl[0]);
 }
 
 async function stLoadAll() {
   try {
-    const r = await fetch(`${SUPA_URL}/rest/v1/entries?select=entry_date,data&order=entry_date.asc`, {
-      headers: SUPA_HEADERS
-    });
-    const rows = await r.json();
+    const uid = `user_id=eq.${USER_ID}`;
+    const [workouts, feelings, foods, supps, waters, flares] = await Promise.all([
+      supaFetch('workout_logs',    `${uid}&order=log_date.asc`),
+      supaFetch('feeling_logs',    `${uid}&order=logged_at.asc`),
+      supaFetch('food_logs',       `${uid}&order=log_date.asc`),
+      supaFetch('supplement_logs', `${uid}&order=log_date.asc`),
+      supaFetch('water_logs',      `${uid}&order=log_date.asc`),
+      supaFetch('flare_logs',      `${uid}&order=log_date.asc`),
+    ]);
     const out = {};
-    rows.forEach(row => { out[row.entry_date] = row.data; });
+    const ensure = d => { if (!out[d]) { out[d] = defaultEntry(); out[d].date = d; } };
+    workouts.forEach(r => { ensure(r.log_date); out[r.log_date].workout = { exercises: r.exercises||{}, cardio: r.cardio||{}, stab: r.stabilization||{}, notes: r.notes||'', day_type: r.day_type }; });
+    feelings.forEach(r => { ensure(r.log_date); out[r.log_date].feeling.logs.push({ time: new Date(r.logged_at).getTime(), _id: r.id, mental: r.mental, physical: r.physical, gut: r.gut, energy: r.energy, clarity: r.clarity, stress: r.stress, sleep: r.sleep_quality, stiffness: r.stiffness_minutes, subluxations: r.subluxations, notes: r.notes }); });
+    foods.forEach(r => { ensure(r.log_date); out[r.log_date].food = { meals: r.meals||{}, cheats: r.cheats||{} }; });
+    supps.forEach(r => { ensure(r.log_date); out[r.log_date].meds = r.supplements||{}; });
+    waters.forEach(r => { ensure(r.log_date); out[r.log_date].water = { total: Number(r.total_oz)||0, log: r.entries||[] }; });
+    flares.forEach(r => { ensure(r.log_date); out[r.log_date].flare = { status: r.status||'good', triggers: r.triggers||[], notes: r.notes||'' }; });
     return out;
   } catch(e) { return {}; }
 }
@@ -827,18 +941,12 @@ function getSuggestedWeight(exId) {
 
 async function init() {
   updateHeader();
-
-  // Load all history from Supabase
+  await ensureUser();
   allHistory = await stLoadAll();
-
-  // Load today
-  const saved = allHistory[todayStr] || await stGet(todayStr);
-  if(saved) currentEntry = saved;
-  else currentEntry = defaultEntry();
-
-  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
-  if(!Array.isArray(currentEntry.feeling.logs)) currentEntry.feeling.logs = [];
-
+  const saved = allHistory[todayStr];
+  currentEntry = saved ? JSON.parse(JSON.stringify(saved)) : defaultEntry();
+  if (!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+  if (!Array.isArray(currentEntry.feeling.logs)) currentEntry.feeling.logs = [];
   renderAll();
 }
 
@@ -890,7 +998,7 @@ function renderDash() {
   document.getElementById('weekStrip').innerHTML = weekDays.map((d,i) => {
     const isToday = d === todayStr;
     const logged = !!allHistory[d];
-    return `<div class="day-pill${isToday?' today':logged?' logged':''}">
+    return `<div class="day-pill${isToday?' today':logged?' logged':''}" onclick="openDayView('${d}')">
       <div class="day-pill-name">${dowShort[i]}</div>
       <div class="day-pill-num">${new Date(d+'T12:00:00').getDate()}</div>
       <div class="day-pill-dot"></div>
@@ -1195,7 +1303,7 @@ function toggleCardio(cid) {
   currentEntry.workout.cardio[cid] = raw;
   const check = document.querySelector(`#cardio-row-${cid} .cardio-check`);
   if(check) { check.className='cardio-check'+(raw.done?' done':''); check.textContent=raw.done?'✓':''; }
-  saveToday(true);
+  saveWorkout(true);
 }
 
 function toggleCardioExpand(cid) {
@@ -1223,7 +1331,7 @@ function updateCardio(cid, field, val) {
     if(check) { check.className='cardio-check done'; check.textContent='✓'; }
   }
   currentEntry.workout.cardio[cid] = raw;
-  saveToday(true);
+  saveWorkout(true);
 }
 
 function calcCardioDist(cid) {
@@ -1399,7 +1507,7 @@ function addWater(oz) {
   currentEntry.water.log.push({oz, time: Date.now()});
   renderWater();
   renderDash();
-  saveToday(true);
+  saveWater(true);
 }
 
 function removeWater(idx) {
@@ -1408,6 +1516,7 @@ function removeWater(idx) {
   currentEntry.water.log.splice(idx, 1);
   renderWater();
   renderDash();
+  saveWater(true);
 }
 
 function renderWater() {
@@ -1762,22 +1871,42 @@ function updateFeelingField(key, val) {
   feelingDraft[key] = isNaN(parsed) ? null : parsed;
 }
 
-function logFeeling() {
+async function logFeeling() {
   feelingDraft.notes = document.getElementById('feelingNotes')?.value || '';
-  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
-  if(!currentEntry.feeling.logs) currentEntry.feeling.logs = [];
-  currentEntry.feeling.logs.push({time: Date.now(), ...feelingDraft});
+  const log = { time: Date.now(), ...feelingDraft };
+  const row = await supaInsert('feeling_logs', {
+    user_id: USER_ID,
+    log_date: todayStr,
+    logged_at: new Date(log.time).toISOString(),
+    mental: log.mental,
+    physical: log.physical,
+    gut: log.gut,
+    energy: log.energy,
+    clarity: log.clarity,
+    stress: log.stress,
+    sleep_quality: log.sleep,
+    stiffness_minutes: (typeof log.stiffness === 'number') ? log.stiffness : null,
+    subluxations: (typeof log.subluxations === 'number') ? log.subluxations : null,
+    notes: log.notes || null
+  });
+  if (row) log._id = row.id;
+  if (!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+  if (!currentEntry.feeling.logs) currentEntry.feeling.logs = [];
+  currentEntry.feeling.logs.push(log);
+  if (!allHistory[todayStr]) allHistory[todayStr] = defaultEntry();
+  allHistory[todayStr].feeling = currentEntry.feeling;
   feelingDraft = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null,sleep:null,stiffness:null,subluxations:null,notes:''};
-  saveToday(true);
   showToast('FEELING LOGGED ✓');
   renderFeeling();
   renderDash();
 }
 
-function deleteFeelingLog(idx) {
-  if(!currentEntry.feeling?.logs) return;
+async function deleteFeelingLog(idx) {
+  if (!currentEntry.feeling?.logs) return;
+  const log = currentEntry.feeling.logs[idx];
+  if (log?._id) await supaDelete('feeling_logs', `id=eq.${log._id}&user_id=eq.${USER_ID}`);
   currentEntry.feeling.logs.splice(idx, 1);
-  saveToday(true);
+  if (allHistory[todayStr]) allHistory[todayStr].feeling = currentEntry.feeling;
   renderFeeling();
   renderDash();
 }
@@ -1786,18 +1915,87 @@ function deleteFeelingLog(idx) {
 // SAVE
 // ═══════════════════════════════════════════════════════
 
-async function saveToday(silent=false) {
-  currentEntry.workout.notes = document.getElementById('workoutNotes')?.value || '';
-  currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
-  if(!currentEntry.feeling) currentEntry.feeling = {logs:[]};
+function ensureHistory() {
+  if (!allHistory[todayStr]) allHistory[todayStr] = defaultEntry();
+}
 
-  const ok = await stSet(todayStr, currentEntry);
-  if(ok) {
-    allHistory[todayStr] = JSON.parse(JSON.stringify(currentEntry));
-    if(!silent) showToast('SAVED ✓');
-  } else {
-    if(!silent) showToast('SAVE FAILED');
+async function saveSection(section, silent = false) {
+  switch(section) {
+    case 'workout': return saveWorkout(silent);
+    case 'food':    return saveFood(silent);
+    case 'meds':    return saveMeds(silent);
+    case 'water':   return saveWater(silent);
+    case 'flare':   return saveFlare(silent);
   }
+}
+
+async function saveWorkout(silent = false) {
+  currentEntry.workout.notes = document.getElementById('workoutNotes')?.value || '';
+  const plan = getDayPlan(todayStr) || { type: 'rest' };
+  const res = await supaUpsert('workout_logs', {
+    user_id: USER_ID, log_date: todayStr, day_type: plan.type,
+    exercises: currentEntry.workout.exercises,
+    cardio: currentEntry.workout.cardio,
+    stabilization: currentEntry.workout.stab,
+    notes: currentEntry.workout.notes,
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].workout = currentEntry.workout; if (!silent) showToast('WORKOUT SAVED ✓'); }
+  else if (!silent) showToast('SAVE FAILED');
+}
+
+async function saveFood(silent = false) {
+  const dow = getDow(todayStr);
+  const isEggDay = dow === 3 || dow === 5;
+  const todayMeals = MEALS.filter(m => { if(m.id==='lunch_a') return !isEggDay; if(m.id==='lunch_b') return isEggDay; return true; });
+  const done = todayMeals.filter(m => currentEntry.food.meals[m.id]);
+  const res = await supaUpsert('food_logs', {
+    user_id: USER_ID, log_date: todayStr,
+    meals: currentEntry.food.meals, cheats: currentEntry.food.cheats,
+    total_calories: done.reduce((s,m)=>s+m.cal,0),
+    total_protein:  done.reduce((s,m)=>s+m.pro,0),
+    total_carbs:    done.reduce((s,m)=>s+m.carb,0),
+    total_fat:      done.reduce((s,m)=>s+m.fat,0),
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].food = currentEntry.food; if (!silent) showToast('FOOD SAVED ✓'); }
+  else if (!silent) showToast('SAVE FAILED');
+}
+
+async function saveMeds(silent = false) {
+  const res = await supaUpsert('supplement_logs', {
+    user_id: USER_ID, log_date: todayStr, supplements: currentEntry.meds,
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].meds = currentEntry.meds; if (!silent) showToast('MEDS SAVED ✓'); }
+  else if (!silent) showToast('SAVE FAILED');
+}
+
+async function saveWater(silent = false) {
+  const res = await supaUpsert('water_logs', {
+    user_id: USER_ID, log_date: todayStr,
+    total_oz: currentEntry.water.total, entries: currentEntry.water.log,
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].water = currentEntry.water; }
+}
+
+async function saveFlare(silent = false) {
+  currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
+  const res = await supaUpsert('flare_logs', {
+    user_id: USER_ID, log_date: todayStr,
+    status: currentEntry.flare.status,
+    triggers: currentEntry.flare.triggers,
+    notes: currentEntry.flare.notes,
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].flare = currentEntry.flare; if (!silent) showToast('FLARE SAVED ✓'); }
+  else if (!silent) showToast('SAVE FAILED');
+}
+
+async function saveToday(silent = false) {
+  await Promise.all([saveWorkout(true), saveFood(true), saveMeds(true), saveWater(true), saveFlare(true)]);
+  if (!silent) showToast('SAVED ✓');
 }
 
 function showToast(msg='SAVED ✓') {
@@ -1827,6 +2025,185 @@ function switchSection(name, el) {
   document.querySelectorAll('.stab').forEach(t=>t.className='stab');
   el.className='stab active';
   currentSection = name;
+}
+
+// ═══════════════════════════════════════════════════════
+// DAY VIEW
+// ═══════════════════════════════════════════════════════
+
+async function openDayView(dateStr) {
+  viewingDate = dateStr;
+  viewEntry = (dateStr === todayStr) ? currentEntry : (allHistory[dateStr] || null);
+
+  // Switch page immediately so navigation works even if rendering errors
+  document.querySelectorAll('.page').forEach(p => p.className = 'page');
+  document.getElementById('page-dayview').className = 'page active';
+  document.querySelectorAll('.nav-btn').forEach(b => b.className = 'nav-btn');
+  document.getElementById('page-dayview').scrollTop = 0;
+
+  // If no cached data for a past day, load it then re-render
+  if (!viewEntry && dateStr !== todayStr) {
+    document.getElementById('dayViewContent').innerHTML = '<div class="empty-state" style="padding:40px 0">Loading...</div>';
+    viewEntry = await stLoadDay(dateStr);
+  }
+
+  try {
+    renderDayView();
+  } catch(err) {
+    console.error('renderDayView error:', err);
+    document.getElementById('dayViewContent').innerHTML = `
+      <div class="dayview-bar">
+        <button class="dayview-back" onclick="closeDayView()">← BACK</button>
+        <div class="dayview-title"><div class="dayview-title-main">${dateStr}</div></div>
+        <button class="dayview-edit" onclick="editDay()">EDIT</button>
+      </div>
+      <div class="empty-state" style="padding:24px">Could not load summary. Tap EDIT to view.</div>`;
+  }
+}
+
+function closeDayView() {
+  document.querySelectorAll('.page').forEach(p => p.className = 'page');
+  document.getElementById('page-dash').className = 'page active';
+  document.querySelectorAll('.nav-btn').forEach(b => b.className = 'nav-btn');
+  document.querySelector('.nav-btn').className = 'nav-btn active';
+  renderDash();
+}
+
+function editDay() {
+  if (viewingDate !== todayStr) {
+    currentEntry = JSON.parse(JSON.stringify(viewEntry));
+    todayStr = viewingDate;
+  }
+  document.querySelectorAll('.page').forEach(p => p.className = 'page');
+  document.getElementById('page-today').className = 'page active';
+  document.querySelectorAll('.nav-btn').forEach(b => b.className = 'nav-btn');
+  document.querySelectorAll('.nav-btn')[1].className = 'nav-btn active';
+  renderAll();
+}
+
+function renderDayView() {
+  if (!viewingDate) return;
+  const e = viewEntry || {};
+  const dateStr = viewingDate;
+  const plan = getDayPlan(dateStr) || {type:'rest',label:'—'};
+  const isToday = dateStr === todayStr;
+  const label = fmtDate(dateStr).toUpperCase();
+
+  const typeColor = {push:'var(--amber)',pull:'var(--blue)',legs:'var(--green)',cardio_only:'var(--purple)',rest:'var(--dim)'}[plan.type] || 'var(--dim)';
+
+  let html = `<div class="dayview-bar">
+    <button class="dayview-back" onclick="closeDayView()">← BACK</button>
+    <div class="dayview-title">
+      <div class="dayview-title-main">${label}</div>
+      <div class="dayview-title-sub" style="color:${typeColor}">${plan.label}</div>
+    </div>
+    <button class="dayview-edit" onclick="editDay()">EDIT</button>
+  </div>`;
+
+  // ── WORKOUT
+  const workout = e.workout || {};
+  const cardioItems = Object.entries(workout.cardio||{}).filter(([,v]) => v && (typeof v==='boolean' ? v : v.done));
+  const exItems = Object.entries(workout.exercises||{}).filter(([,v]) => v?.sets?.some(s=>s.weight>0));
+  const stabDone = Object.values(workout.stab||{}).filter(Boolean).length;
+
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">🏋️</div><div class="card-title">WORKOUT</div></div><div class="card-body">`;
+  if (!cardioItems.length && !exItems.length && !stabDone) {
+    html += `<div class="empty-state">Nothing logged</div>`;
+  } else {
+    cardioItems.forEach(([cid, v]) => {
+      const ct = CARDIO_TARGETS[cid];
+      const d = typeof v === 'object' ? v : {};
+      const summary = [d.duration&&`${d.duration}m`, d.speed&&`${d.speed}mph`, d.incline!=null&&d.incline!==''&&`${d.incline}%`, d.distance&&`${d.distance}mi`].filter(Boolean).join(' · ') || 'Done';
+      html += `<div class="ts-row"><div class="ts-icon">${ct?.icon||'🏃'}</div><div class="ts-label">${ct?.name||cid}</div><div class="ts-val" style="color:var(--green);font-family:var(--font-mono);font-size:11px">${summary}</div></div>`;
+    });
+    exItems.forEach(([exId, v]) => {
+      const ex = [...EXERCISES.push,...EXERCISES.pull,...EXERCISES.legs].find(e=>e.id===exId);
+      const sets = v.sets?.filter(s=>s.weight>0).map(s=>`${s.weight}×${s.reps||'?'}`).join(', ')||'';
+      html += `<div class="ts-row"><div class="ts-icon">💪</div><div class="ts-label">${ex?.name||exId}</div><div class="ts-val" style="font-family:var(--font-mono);font-size:11px">${sets}</div></div>`;
+    });
+    if (stabDone) html += `<div class="ts-row"><div class="ts-icon">🟣</div><div class="ts-label">Stabilization</div><div class="ts-val" style="color:var(--green)">${stabDone} done</div></div>`;
+    if (workout.notes) html += `<div style="font-size:11px;color:var(--dim);margin-top:6px;padding-top:6px;border-top:1px solid var(--faint)">${workout.notes}</div>`;
+  }
+  html += `</div></div>`;
+
+  // ── FEELING LOGS
+  const feelLogs = (e.feeling?.logs||[]).slice().sort((a,b)=>a.time-b.time);
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">🧠</div><div class="card-title">FEELING LOGS</div></div><div class="card-body">`;
+  if (!feelLogs.length) {
+    html += `<div class="empty-state">No feeling logs</div>`;
+  } else {
+    html += feelLogs.map(log => {
+      const scores = FEELING_DIMS.map(d => {
+        const v = log[d.key];
+        if (v == null) return '';
+        return `<span class="feeling-hist-score" style="color:${PIP_COLORS[Math.min(10,Math.max(1,Math.round(v)))]}">${d.label} ${v}</span>`;
+      }).filter(Boolean);
+      const stiffStr = log.stiffness != null ? `<span class="feeling-hist-score">STIFF ${log.stiffness}m</span>` : '';
+      const subxStr  = log.subluxations != null ? `<span class="feeling-hist-score">SUBX ${log.subluxations}</span>` : '';
+      return `<div class="feeling-hist-entry">
+        <div class="feeling-hist-time">${fmtTime(log.time)}</div>
+        <div class="feeling-hist-scores">${scores.join('')}${stiffStr}${subxStr}</div>
+        ${log.notes ? `<div style="font-size:10px;color:var(--dim);margin-top:3px">${log.notes}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  html += `</div></div>`;
+
+  // ── FOOD
+  const food = e.food || {};
+  const mealsDone = Object.entries(food.meals||{}).filter(([,v])=>v);
+  const cheats = Object.entries(food.cheats||{}).filter(([,v])=>v>0);
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">🥗</div><div class="card-title">FOOD</div></div><div class="card-body">`;
+  if (!mealsDone.length && !cheats.length) {
+    html += `<div class="empty-state">Nothing logged</div>`;
+  } else {
+    mealsDone.forEach(([id]) => {
+      const meal = MEALS.find(m=>m.id===id);
+      if (meal) html += `<div class="ts-row"><div class="ts-icon">✓</div><div class="ts-label">${meal.name}</div><div class="ts-val" style="font-family:var(--font-mono);font-size:11px">${meal.cal} cal</div></div>`;
+    });
+    cheats.forEach(([id, count]) => {
+      const cheat = CHEATS.find(c=>c.id===id);
+      if (cheat) html += `<div class="ts-row"><div class="ts-icon">${cheat.emoji}</div><div class="ts-label">${cheat.name}</div><div class="ts-val" style="color:var(--red)">×${count}</div></div>`;
+    });
+  }
+  html += `</div></div>`;
+
+  // ── SUPPLEMENTS
+  const meds = e.meds || {};
+  const medsDone = Object.entries(meds).filter(([,v])=>v);
+  const totalMeds = MEDS.reduce((s,g)=>s+g.items.length,0);
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">💊</div><div class="card-title">SUPPLEMENTS</div></div><div class="card-body">`;
+  if (!medsDone.length) {
+    html += `<div class="empty-state">None logged</div>`;
+  } else {
+    html += `<div class="ts-row"><div class="ts-icon">✓</div><div class="ts-label">Taken</div><div class="ts-val" style="color:var(--green)">${medsDone.length} / ${totalMeds}</div></div>`;
+    medsDone.forEach(([id]) => {
+      const med = MEDS.flatMap(g=>g.items).find(m=>m.id===id);
+      if (med) html += `<div class="ts-row" style="padding:3px 0"><div class="ts-icon">${med.icon}</div><div class="ts-label" style="font-size:12px">${med.name}</div></div>`;
+    });
+  }
+  html += `</div></div>`;
+
+  // ── WATER
+  const water = e.water || {total:0};
+  const wPct = Math.min((water.total||0)/100*100, 100);
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">💧</div><div class="card-title">WATER</div></div><div class="card-body">
+    <div style="font-family:var(--font-display);font-size:40px;color:var(--blue);text-align:center;margin:4px 0">${water.total||0} oz</div>
+    <div class="water-bar-wrap"><div class="water-bar-bg"><div class="water-bar-fill" style="width:${wPct}%"></div></div>
+    <div class="water-bar-label"><span>0 oz</span><span>50 oz</span><span>100 oz</span></div></div>
+  </div></div>`;
+
+  // ── FLARE
+  const flare = e.flare || {status:'good',triggers:[],notes:''};
+  const flareLabel = {good:'✓ Good',mild:'⚡ Mild Stiffness',warm:'🔥 Warm/Swollen',flare:'🛑 Active Flare'}[flare.status]||'—';
+  const flareDot = {good:'dot-green',mild:'dot-amber',warm:'dot-amber',flare:'dot-red'}[flare.status]||'dot-gray';
+  html += `<div class="card"><div class="card-hdr"><div class="card-icon">🔥</div><div class="card-title">JOINT STATUS</div></div><div class="card-body">
+    <div class="ts-row"><div class="ts-icon">🦴</div><div class="ts-label">Status</div><div class="ts-val">${flareLabel}</div><div class="ts-dot ${flareDot}"></div></div>`;
+  if (flare.triggers?.length) html += `<div class="ts-row"><div class="ts-icon">⚠️</div><div class="ts-label">Triggers</div><div class="ts-val" style="font-size:11px">${flare.triggers.join(', ')}</div></div>`;
+  if (flare.notes) html += `<div style="font-size:11px;color:var(--dim);margin-top:6px">${flare.notes}</div>`;
+  html += `</div></div>`;
+
+  document.getElementById('dayViewContent').innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════
