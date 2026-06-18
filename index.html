@@ -979,7 +979,7 @@ select:focus{outline:none;border-color:var(--amber)}
     <div class="sheet-hdr">
       <div style="flex:1;min-width:0">
         <div class="sheet-title" id="fdFoodName"></div>
-        <div id="fdInflam" class="inflam-badge" style="display:none;margin-top:3px">⚠ Inflammatory</div>
+        <div id="fdFlagWrap" style="margin-top:4px"></div>
       </div>
       <div class="sheet-close" onclick="closeFoodDetail()">×</div>
     </div>
@@ -1197,6 +1197,13 @@ const UNIT_WEIGHTS = {g:1, oz:28.35, cup:240, tbsp:15, tsp:5, ml:1, piece:100, s
 const TARGET_CAL = 1600, TARGET_PRO = 190, TARGET_CARB = 150, TARGET_FAT = 60;
 const MEAL_SLOTS = ['breakfast','lunch','dinner','snacks'];
 const SLOT_LABELS = {breakfast:'BREAKFAST', lunch:'LUNCH', dinner:'DINNER', snacks:'SNACKS'};
+const INFLAMMATORY_INGREDIENTS = [
+  'refined sugar','high fructose corn syrup','corn syrup','canola oil','soybean oil',
+  'sunflower oil','safflower oil','cottonseed oil','vegetable oil','margarine',
+  'trans fat','hydrogenated','white flour','bleached flour','alcohol','processed meat',
+  'deli meat','hot dog','sausage','bacon','msg','artificial flavor','artificial color',
+  'red 40','yellow 5','yellow 6','sodium nitrate','carrageenan','maltodextrin',
+];
 
 function defaultEntry() {
   return {
@@ -2019,17 +2026,24 @@ function renderFood() {
     if (!slotEntries.length) {
       groupsHtml += `<div style="font-size:12px;color:var(--dim);padding:3px 0 6px">Nothing logged</div>`;
     } else {
+      let flaggedInSlot = 0;
       slotEntries.forEach(item => {
         const gIdx = entries.indexOf(item);
+        const fl = flagFood(item);
+        if (fl.anyFlag) flaggedInSlot++;
+        const nameStyle = fl.isGeneral ? 'color:var(--red)' : '';
+        const fire = fl.isPersonal ? ' 🔥' : '';
         groupsHtml += `<div class="logged-item" onclick="tapLoggedItem(${gIdx})">
           <div class="logged-item-info">
-            <div class="logged-item-name">${escHtml(item.name)}</div>
+            <div class="logged-item-name" style="${nameStyle}">${escHtml(item.name)}${fire}</div>
             <div class="logged-item-macros">${item.servings}${item.unit} · ${Math.round(item.cal||0)} cal · ${Math.round(item.protein||0)}g P · ${Math.round(item.carbs||0)}g C · ${Math.round(item.fat||0)}g F</div>
           </div>
-          ${(item.inflammatory_score||0)>0?'<div class="inflam-badge">⚠ Inflam</div>':''}
           <div class="logged-item-del" onclick="event.stopPropagation();deleteLoggedFood(${gIdx})">×</div>
         </div>`;
       });
+      if (flaggedInSlot > 0) {
+        groupsHtml += `<div style="font-size:11px;color:var(--dim);padding:4px 0 2px">⚠️ ${flaggedInSlot} flagged item${flaggedInSlot>1?'s':''} in this meal</div>`;
+      }
     }
     groupsHtml += `</div>`;
   });
@@ -2598,6 +2612,18 @@ function scoreFoodInflammation(name) {
   return {score:0, flags:[]};
 }
 
+function flagFood(food) {
+  const haystack = ((food.name || '') + ' ' + (food.ingredients_text || '')).toLowerCase();
+  const general = INFLAMMATORY_INGREDIENTS.filter(t => haystack.includes(t));
+  const personal = currentTriggers.filter(t => t && haystack.includes(t.toLowerCase()));
+  return {
+    general, personal,
+    isGeneral: general.length > 0,
+    isPersonal: personal.length > 0,
+    anyFlag: general.length > 0 || personal.length > 0,
+  };
+}
+
 function calcMacrosForEntry(food, unit, servings) {
   const unitG = (unit === 'serving' && food?.serving_g) ? food.serving_g : (UNIT_WEIGHTS[unit] || 1);
   const weightG = unitG * servings;
@@ -2652,12 +2678,14 @@ function renderSearchResults(results) {
     html += '<div class="empty-state" style="padding:20px 0">No results found.</div>';
   } else {
     results.forEach((f, i) => {
+      const fl = flagFood(f);
+      const nameStyle = fl.isGeneral ? 'color:var(--red)' : '';
+      const fire = fl.isPersonal ? ' 🔥' : '';
       html += `<div class="food-result" onclick="selectSearchResult(${i})">
         <div class="food-result-info">
-          <div class="food-result-name">${escHtml(f.name)}</div>
+          <div class="food-result-name" style="${nameStyle}">${escHtml(f.name)}${fire}</div>
           <div class="food-result-cal">${Math.round(f.cal_per_100g||0)} cal/100g · P ${Math.round(f.protein_per_100g||0)}g · C ${Math.round(f.carbs_per_100g||0)}g · F ${Math.round(f.fat_per_100g||0)}g</div>
         </div>
-        ${(f.inflammatory_score||0)>0?'<div class="inflam-badge">⚠</div>':''}
         <div class="food-result-src">${f._source||''}</div>
       </div>`;
     });
@@ -2813,7 +2841,8 @@ async function fetchLiveFoods(term) {
         results.push({external_id:'usda_'+f.fdcId, name:f.description,
           cal_per_100g:gn(1008), protein_per_100g:gn(1003), carbs_per_100g:gn(1005), fat_per_100g:gn(1004),
           inflammatory_score:score, inflammatory_flags:flags, _source:'USDA',
-          serving_g: uSG||null, serving_estimated: uSG ? uSEst : true});
+          serving_g: uSG||null, serving_estimated: uSG ? uSEst : true,
+          ingredients_text: f.ingredients || null});
       });
     }
     if (oR.status==='fulfilled' && oR.value?.products) {
@@ -2832,7 +2861,8 @@ async function fetchLiveFoods(term) {
           cal_per_100g:n['energy-kcal_100g']||0, protein_per_100g:n['proteins_100g']||0,
           carbs_per_100g:n['carbohydrates_100g']||0, fat_per_100g:n['fat_100g']||0,
           inflammatory_score:score, inflammatory_flags:flags, _source:'OFF',
-          serving_g: oSG||null, serving_estimated: oSG ? oSEst : true});
+          serving_g: oSG||null, serving_estimated: oSG ? oSEst : true,
+          ingredients_text: p.ingredients_text || null});
       });
     }
     return results;
@@ -2871,7 +2901,7 @@ function openFoodDetail(food, slot) {
   fsDetailSlot = slot || fsSlot || 'breakfast';
 
   document.getElementById('fdFoodName').textContent = food.name;
-  document.getElementById('fdInflam').style.display = (food.inflammatory_score||0)>0 ? 'inline-flex' : 'none';
+  renderDetailFlags();
   document.getElementById('fdServings').value = fsServings;
   document.getElementById('fdSlotsWrap').style.display = rbAddingIngredient ? 'none' : '';
   document.getElementById('fdLogBtn').textContent = rbAddingIngredient ? 'ADD TO RECIPE' : 'LOG IT';
@@ -2901,6 +2931,16 @@ function renderDetailSlots() {
   document.getElementById('fdSlots').innerHTML = MEAL_SLOTS.map(s =>
     `<div class="slot-chip${fsDetailSlot===s?' sel':''}" onclick="setDetailSlot('${s}')">${SLOT_LABELS[s]}</div>`
   ).join('');
+}
+
+function renderDetailFlags() {
+  const wrap = document.getElementById('fdFlagWrap');
+  if (!wrap || !fsSelected) return;
+  const fl = flagFood(fsSelected);
+  let html = '';
+  if (fl.isPersonal) html += `<div style="font-size:11px;line-height:1.4">🔥 Contains personal trigger: <b>${escHtml(fl.personal.join(', '))}</b></div>`;
+  if (fl.isGeneral)  html += `<div style="font-size:11px;color:var(--red);line-height:1.4">Contains inflammatory ingredient: <b>${escHtml(fl.general.slice(0,3).join(', '))}</b></div>`;
+  wrap.innerHTML = html;
 }
 
 function renderDetailMacros() {
