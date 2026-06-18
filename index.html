@@ -387,6 +387,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .err-title{font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--red);margin-bottom:12px}
 .err-body{font-size:13px;color:var(--text);white-space:normal;word-break:break-word;line-height:1.5;margin-bottom:18px}
 .err-dismiss{width:100%;background:var(--red);color:var(--text);border:none;padding:11px;border-radius:7px;font-family:var(--font-display);font-size:15px;letter-spacing:2px;cursor:pointer}
+.err-diag{margin-top:12px;padding:10px;background:var(--s3);border-radius:6px;font-family:var(--font-mono);font-size:11px;color:var(--dim);white-space:normal;word-break:break-word;line-height:1.8}
 
 /* MISC */
 .divider{height:1px;background:var(--border);margin:10px 0}
@@ -1169,7 +1170,9 @@ async function supaUpsert(table, data) {
   // Confirm session is valid before any write
   const session = await getOrRefreshSession();
   if (!session?.user?.id) {
-    showErrorModal('Save failed: no valid session. Please sign in again.');
+    showErrorModal('Save failed: no valid session. Please sign in again.', {
+      userId: USER_ID, sessionUid: undefined, table, method: 'none', status: 'no session'
+    });
     return { ok: false, err: 'no valid session' };
   }
   if (USER_ID !== session.user.id) USER_ID = session.user.id;
@@ -1177,7 +1180,9 @@ async function supaUpsert(table, data) {
   const { user_id, log_date } = data;
   console.log('[supaUpsert] user_id:', user_id, 'type:', typeof user_id);
   if (!user_id || !log_date) {
-    showErrorModal(`Save failed ${table}: missing user_id or log_date`);
+    showErrorModal(`Save failed ${table}: missing user_id or log_date`, {
+      userId: user_id, sessionUid: session.user.id, table, method: 'none', status: 'missing fields'
+    });
     return { ok: false, err: 'missing user_id or log_date' };
   }
   try {
@@ -1191,7 +1196,9 @@ async function supaUpsert(table, data) {
     if (!patchR.ok) {
       const err = await patchR.json().catch(() => ({ message: patchR.statusText }));
       const detail = err.message || err.details || err.code || patchR.statusText;
-      showErrorModal(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`);
+      showErrorModal(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`, {
+        userId: user_id, sessionUid: session.user.id, table, method: 'PATCH', status: patchR.status
+      });
       return { ok: false, err: detail };
     }
     const patched = await patchR.json().catch(() => []);
@@ -1219,12 +1226,16 @@ async function supaUpsert(table, data) {
       }
       const err = await postR.json().catch(() => ({ message: postR.statusText }));
       const detail = err.message || err.details || err.code || postR.statusText;
-      showErrorModal(`Save failed ${table}: HTTP ${postR.status} — ${detail}`);
+      showErrorModal(`Save failed ${table}: HTTP ${postR.status} — ${detail}`, {
+        userId: user_id, sessionUid: session.user.id, table, method: 'POST', status: postR.status
+      });
       return { ok: false, err: detail };
     }
     return { ok: true };
   } catch(e) {
-    showErrorModal(`Save failed ${table}: ${e.message}`);
+    showErrorModal(`Save failed ${table}: ${e.message}`, {
+      userId: user_id, sessionUid: session?.user?.id, table, method: 'unknown', status: 'exception'
+    });
     return { ok: false, err: e.message };
   }
 }
@@ -3268,11 +3279,23 @@ function showToast(msg='SAVED ✓') {
   setTimeout(()=>t.className='toast', 2000);
 }
 
-function showErrorModal(msg) {
+function showErrorModal(msg, diag = null) {
   const overlay = document.createElement('div');
   overlay.className = 'err-overlay';
   overlay.innerHTML = '<div class="err-card"><div class="err-title">SAVE ERROR</div><div class="err-body"></div><button class="err-dismiss">DISMISS</button></div>';
   overlay.querySelector('.err-body').textContent = msg;
+  if (diag) {
+    const d = document.createElement('div');
+    d.className = 'err-diag';
+    d.textContent = [
+      `user_id:     ${diag.userId ?? 'undefined'}`,
+      `session uid: ${diag.sessionUid ?? 'undefined'}`,
+      `table:       ${diag.table ?? 'unknown'}`,
+      `method:      ${diag.method ?? 'unknown'}`,
+      `status:      ${diag.status ?? 'unknown'}`,
+    ].join('\n');
+    overlay.querySelector('.err-body').after(d);
+  }
   overlay.querySelector('.err-dismiss').onclick = () => overlay.remove();
   document.body.appendChild(overlay);
 }
