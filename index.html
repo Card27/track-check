@@ -1,5 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  INDEX.HTML — TABLE OF CONTENTS
+  ================================
+  Single-file app (no build step). All HTML, CSS, and JS live here.
+  Line numbers are approximate; they shift if content is inserted above.
+
+  ── CSS (lines ~10–395) ─────────────────────────────────────────────
+  Line ~12   — CSS Variables & Design Tokens (:root)
+  Line ~24   — Base / Reset  (html, body, .app)
+  Line ~27   — Header
+  Line ~35   — Bottom Nav
+  Line ~42   — Pages & scroll containers
+  Line ~49   — Cards
+  Line ~57   — Dashboard  (KPI row, ring cards, week strip, today summary)
+  Line ~96   — Today Tab  (section tabs, .stab)
+  Line ~102  — Workout    (exercise rows, stabilization, cardio)
+  Line ~150  — Food       (meal items, cal summary bar)
+  Line ~169  — Cheat Tracker
+  Line ~190  — Meds
+  Line ~203  — Water
+  Line ~222  — Flare Tracker
+  Line ~239  — Week Page  (week day cards, lift progression, mini chart)
+  Line ~261  — Notes textarea
+  Line ~265  — Save Button
+  Line ~270  — Toast notification
+  Line ~274  — Misc  (divider, select, empty-state)
+  Line ~281  — Progress Chart (SVG mini chart)
+  Line ~285  — Day View (day view bar, back/edit buttons)
+  Line ~295  — Energy / Feeling (pip rows, history entries)
+  Line ~304  — Feeling section
+  Line ~324  — Auth Screen
+  Line ~341  — Nutrition Phase 2 (macro pills, meal groups, logged items, inflam badge)
+  Line ~361  — Bottom Sheets (sheet overlay, food search, food detail, recipe builder)
+
+  ── HTML STRUCTURE (lines ~398–849) ─────────────────────────────────
+  Line ~399  — Auth Screen  (#auth-screen)
+  Line ~402  —   Step 1: Credentials  (email, password, sign-in / create-account)
+  Line ~427  —   Step 2: Profile  (name, age, height, conditions — signup only)
+  Line ~485  — App Shell  (.app — header + pages + bottom nav)
+  Line ~498  — DASH page  (#page-dash)
+  Line ~569  — TODAY page (#page-today)
+  Line ~581  —   Section: Workout   (#section-workout)
+  Line ~593  —   Section: Food      (#section-food) — log food btn, totals bar, meal groups, cheats
+  Line ~610  —   Section: Meds      (#section-meds)
+  Line ~616  —   Section: Water     (#section-water)
+  Line ~645  —   Section: Flare     (#section-flare)
+  Line ~673  —   Section: Feeling   (#section-feeling — rendered dynamically)
+  Line ~676  —   Section: Body      (#section-body)
+  Line ~694  — DAY VIEW page  (#page-dayview — rendered dynamically)
+  Line ~699  — WEEK page     (#page-week)
+  Line ~746  — SETTINGS page (#page-settings — rendered dynamically)
+  Line ~760  — Bottom Nav    (.nav)
+  Line ~782  — Food Search Sheet   (#foodSearchSheet)
+  Line ~803  — Food Detail Sheet   (#foodDetailSheet)
+  Line ~838  — Recipe Builder Sheet (#recipeBuilderSheet)
+
+  ── JAVASCRIPT (lines ~851–3321) ────────────────────────────────────
+  Line ~853  — DATA DEFINITIONS
+                 EXERCISES (push/pull/legs), STAB_EXERCISES, FEELING_DIMS,
+                 DAY_PLAN, CARDIO_TARGETS, MEALS, CHEATS, MEDS, CONDITIONS
+  Line ~985  — STATE VARIABLES
+                 currentEntry, allHistory, currentSection, feelingDraft,
+                 currentSession, currentProfile, fsSlot, recipeState, etc.
+  Line ~1029 — STORAGE — Supabase Helpers
+                 supaFetch, supaUpsert, supaInsert, supaDelete,
+                 mergeDay, stLoadDay, stLoadAll
+  Line ~1169 — UTILITY HELPERS
+                 getDow, getDayPlan, fmtDate, fmtTime, getWeekDays,
+                 getLastWeight, getSuggestedWeight, escHtml, calcTodayCals,
+                 foodEntries
+  Line ~1222 — INIT & LOAD
+                 init, loadApp, getWeekNum, getStabForWeek, updateHeader, renderAll
+  Line ~1272 — DASHBOARD  (renderDash)
+  Line ~1419 — WORKOUT    (renderWorkout, toggleExercise, updateExSet, toggleCardio, toggleStab)
+  Line ~1660 — FOOD — legacy cheats  (renderCheats, changeCheat)
+  Line ~1763 — MEDS       (renderMeds, toggleMed)
+  Line ~1805 — WATER      (addWater, removeWater, renderWater)
+  Line ~1843 — FLARE      (renderFlare, setFlare, addTrigger, removeTrigger)
+  Line ~1917 — WEEK PAGE  (renderWeekPage)
+  Line ~2082 —   + FEELING  (renderFeeling, setFeeling, logFeeling, deleteFeelingLog)
+  Line ~2218 — SAVE FUNCTIONS
+                 saveSection, saveWorkout, saveFood, saveMeds,
+                 saveWater, saveFlare, saveBody, saveToday
+  Line ~2267 — NUTRITION — Helpers
+                 scoreFoodInflammation, calcMacrosForEntry
+  Line ~2296 — NUTRITION — Food Search Sheet
+                 openFoodSearch, closeFoodSearch, doFoodSearch,
+                 renderSearchResults, selectSearchResult,
+                 fetchPrevFoods, fetchCachedFoods, fetchLiveFoods,
+                 cacheFoodToSupabase
+  Line ~2437 — NUTRITION — Food Detail Sheet
+                 openFoodDetail, closeFoodDetail, renderDetailUnits,
+                 renderDetailSlots, renderDetailMacros, setDetailUnit,
+                 setDetailSlot, updateDetailServings,
+                 handleLogOrAddIngredient, logFood,
+                 deleteLoggedFood, tapLoggedItem
+  Line ~2553 — NUTRITION — Recipe Builder
+                 openRecipeBuilder, closeRecipeBuilder,
+                 openRecipeIngredientSearch, addRecipeIngredient,
+                 removeRecipeIngredient, renderRecipeBuilder,
+                 saveAndLogRecipe, logRecipeNow
+  Line ~2785 — AUTH
+                 getOrRefreshSession, setSession, showAuthScreen,
+                 hideAuthScreen, showAuthStep, setAuthError,
+                 handleSignIn, handleCreateAccount, handleCompleteSetup,
+                 handleSignOut
+  Line ~2973 — PROFILE    (loadProfile, upsertProfile)
+  Line ~3005 — SETTINGS   (renderSettings, toggleSettingUnit, saveSettings)
+  Line ~3108 — NAV        (switchPage, switchSection, goToFoodLog)
+  Line ~3139 — DAY VIEW   (openDayView, closeDayView, editDay, renderDayView)
+  Line ~3318 — GO         (init — entry point)
+-->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -270,6 +382,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* TOAST */
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#080810;padding:9px 20px;border-radius:7px;font-family:var(--font-display);font-size:15px;letter-spacing:2px;opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red);color:var(--text)}
 
 /* MISC */
 .divider{height:1px;background:var(--border);margin:10px 0}
@@ -1050,8 +1163,12 @@ async function supaFetch(table, params = '') {
 
 async function supaUpsert(table, data) {
   const { user_id, log_date } = data;
+  if (!user_id || !log_date) {
+    showToast(`Save failed ${table}: missing user_id or log_date`, 'error');
+    return { ok: false, err: 'missing user_id or log_date' };
+  }
   try {
-    // PATCH first — updates the row if it exists
+    // PATCH first — updates the row if it exists, returns representation to detect hit
     const patchR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
       method: 'PATCH',
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
@@ -1059,8 +1176,9 @@ async function supaUpsert(table, data) {
     });
     if (!patchR.ok) {
       const err = await patchR.json().catch(() => ({ message: patchR.statusText }));
-      console.error(`[supabase] ${table} PATCH failed ${patchR.status}:`, err);
-      return { ok: false, err: err.message || err.code || patchR.status };
+      const detail = err.message || err.details || err.code || patchR.statusText;
+      showToast(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`, 'error');
+      return { ok: false, err: detail };
     }
     const patched = await patchR.json().catch(() => []);
     if (patched.length > 0) return { ok: true };
@@ -1072,11 +1190,15 @@ async function supaUpsert(table, data) {
     });
     if (!postR.ok) {
       const err = await postR.json().catch(() => ({ message: postR.statusText }));
-      console.error(`[supabase] ${table} POST failed ${postR.status}:`, err);
-      return { ok: false, err: err.message || err.code || postR.status };
+      const detail = err.message || err.details || err.code || postR.statusText;
+      showToast(`Save failed ${table}: HTTP ${postR.status} — ${detail}`, 'error');
+      return { ok: false, err: detail };
     }
     return { ok: true };
-  } catch(e) { console.error(`[supabase] ${table} upsert error:`, e); return { ok: false, err: e.message }; }
+  } catch(e) {
+    showToast(`Save failed ${table}: ${e.message}`, 'error');
+    return { ok: false, err: e.message };
+  }
 }
 
 async function supaInsert(table, data) {
@@ -3097,11 +3219,11 @@ async function saveSettings() {
   }
 }
 
-function showToast(msg='SAVED ✓') {
+function showToast(msg='SAVED ✓', type='') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast show';
-  setTimeout(()=>t.className='toast', 2000);
+  t.className = 'toast show' + (type === 'error' ? ' error' : '');
+  setTimeout(()=>t.className='toast', type === 'error' ? 5000 : 2000);
 }
 
 // ═══════════════════════════════════════════════════════
