@@ -940,7 +940,7 @@ select:focus{outline:none;border-color:var(--amber)}
       <div class="search-bar">
         <div class="fs-input-wrap">
           <input class="search-input" id="fsInput" type="text" placeholder="Chicken breast, oats, banana..."
-            oninput="clearTimeout(window._fsTimer);window._fsTimer=setTimeout(()=>doFoodSearch(this.value),400)">
+            oninput="clearTimeout(window._fsTimer);window._fsTimer=setTimeout(()=>doFoodSearch(document.getElementById('fsInput').value.trim()),400)">
           <button class="fs-camera-btn" onclick="openBarcodeScanner()" title="Scan barcode">📷</button>
         </div>
       </div>
