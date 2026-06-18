@@ -361,7 +361,7 @@ select:focus{outline:none;border-color:var(--amber)}
         <div id="authError" class="auth-error"></div>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
           <button class="save-btn" onclick="handleCreateAccount()">CREATE ACCOUNT</button>
-          <button class="save-btn" style="background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="handleSignIn()">SIGN IN</button>
+          <button id="signInBtn" class="save-btn" style="background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="handleSignIn()">SIGN IN</button>
         </div>
       </div>
     </div>
@@ -2282,6 +2282,9 @@ async function handleSignIn() {
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   if (!email || !password) { setAuthError('Email and password required'); return; }
+  const btn = document.getElementById('signInBtn');
+  btn.disabled = true;
+  btn.textContent = 'SIGNING IN...';
   setAuthError('');
   try {
     const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
@@ -2290,10 +2293,16 @@ async function handleSignIn() {
       body: JSON.stringify({ email, password })
     });
     const data = await r.json();
-    if (!r.ok) { setAuthError(data.error_description || data.msg || 'Sign in failed'); return; }
+    if (!r.ok) {
+      setAuthError(data.error_description || data.msg || 'Sign in failed');
+      btn.textContent = 'SIGN IN'; btn.disabled = false; return;
+    }
     setSession(data);
     await loadApp();
-  } catch(e) { setAuthError('Network error. Please try again.'); }
+  } catch(e) {
+    setAuthError('Network error. Please try again.');
+    btn.textContent = 'SIGN IN'; btn.disabled = false;
+  }
 }
 
 async function handleCreateAccount() {
@@ -2319,7 +2328,10 @@ async function handleCompleteSetup() {
       body: JSON.stringify({ email: signupEmail, password: signupPassword })
     });
     const data = await r.json();
-    if (!r.ok) { setStep2Error(data.error_description || data.msg || 'Signup failed'); return; }
+    if (!r.ok) {
+      setStep2Error(data.error_description || data.msg || 'Signup failed');
+      btn.textContent = 'COMPLETE SETUP'; btn.disabled = false; return;
+    }
     setSession(data);
 
     const ft = parseInt(document.getElementById('profFt').value) || 0;
@@ -2336,8 +2348,10 @@ async function handleCompleteSetup() {
       updated_at: new Date().toISOString()
     });
     await loadApp();
-  } catch(e) { setStep2Error('Network error. Please try again.'); }
-  finally { btn.textContent = 'COMPLETE SETUP'; btn.disabled = false; }
+  } catch(e) {
+    setStep2Error('Network error. Please try again.');
+    btn.textContent = 'COMPLETE SETUP'; btn.disabled = false;
+  }
 }
 
 async function handleSignOut() {
