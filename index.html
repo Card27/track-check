@@ -411,6 +411,7 @@ select:focus{outline:none;border-color:var(--amber)}
         <div class="stab" onclick="switchSection('water',this)">WATER</div>
         <div class="stab" onclick="switchSection('flare',this)">FLARE</div>
         <div class="stab" onclick="switchSection('feeling',this)">FEELING</div>
+        <div class="stab" onclick="switchSection('body',this)">BODY</div>
       </div>
 
       <!-- WORKOUT SECTION -->
@@ -502,6 +503,14 @@ select:focus{outline:none;border-color:var(--amber)}
             <textarea class="notes-area" id="flareNotes" placeholder="Any observations — joint locations, severity, what helps..."></textarea>
           </div>
         </div>
+        <button class="save-btn" onclick="saveSection('flare')">SAVE FLARE LOG</button>
+      </div>
+
+      <!-- ENERGY SECTION -->
+      <div id="section-feeling" style="display:none"></div>
+
+      <!-- BODY SECTION -->
+      <div id="section-body" style="display:none">
         <div class="card">
           <div class="card-hdr">
             <div class="card-icon">⚖️</div>
@@ -509,16 +518,13 @@ select:focus{outline:none;border-color:var(--amber)}
           </div>
           <div class="card-body">
             <div class="ex-field">
-              <label>TODAY'S WEIGHT (LBS)</label>
-              <input type="number" inputmode="decimal" step="0.1" id="weightInput" placeholder="e.g. 185.5" onchange="updateWeight(this.value)">
+              <label>WEIGHT (LBS)</label>
+              <input type="number" inputmode="decimal" step="0.1" id="bodyWeightInput" placeholder="e.g. 185.5">
             </div>
           </div>
         </div>
-        <button class="save-btn" onclick="saveSection('flare')">SAVE FLARE LOG</button>
+        <button class="save-btn" onclick="saveSection('body')">SAVE BODY LOG</button>
       </div>
-
-      <!-- ENERGY SECTION -->
-      <div id="section-feeling" style="display:none"></div>
     </div>
 
     <!-- DAY VIEW -->
@@ -854,7 +860,7 @@ async function supaDelete(table, filter) {
   } catch(e) { return false; }
 }
 
-function mergeDay(dateStr, w, feelings, f, s, wt, fl) {
+function mergeDay(dateStr, w, feelings, f, s, wt, fl, body) {
   const entry = defaultEntry();
   entry.date = dateStr;
   if (w) entry.workout = { exercises: w.exercises||{}, cardio: w.cardio||{}, stab: w.stabilization||{}, notes: w.notes||'', day_type: w.day_type };
@@ -869,36 +875,36 @@ function mergeDay(dateStr, w, feelings, f, s, wt, fl) {
   if (f) entry.food = { meals: f.meals||{}, cheats: f.cheats||{} };
   if (s) entry.meds = s.supplements||{};
   if (wt) entry.water = { total: Number(wt.total_oz)||0, log: wt.entries||[] };
-  if (fl) {
-    entry.flare = { status: fl.status||'good', triggers: fl.triggers||[], notes: fl.notes||'' };
-    if (fl.weight_lbs != null) entry.weight = fl.weight_lbs;
-  }
+  if (fl) entry.flare = { status: fl.status||'good', triggers: fl.triggers||[], notes: fl.notes||'' };
+  if (body && body.weight_lbs != null) entry.weight = body.weight_lbs;
   return entry;
 }
 
 async function stLoadDay(dateStr) {
   const uid = `user_id=eq.${USER_ID}`;
-  const [w, feelings, f, s, wt, fl] = await Promise.all([
+  const [w, feelings, f, s, wt, fl, body] = await Promise.all([
     supaFetch('workout_logs',    `${uid}&log_date=eq.${dateStr}`),
     supaFetch('feeling_logs',    `${uid}&log_date=eq.${dateStr}&order=logged_at.asc`),
     supaFetch('food_logs',       `${uid}&log_date=eq.${dateStr}`),
     supaFetch('supplement_logs', `${uid}&log_date=eq.${dateStr}`),
     supaFetch('water_logs',      `${uid}&log_date=eq.${dateStr}`),
     supaFetch('flare_logs',      `${uid}&log_date=eq.${dateStr}`),
+    supaFetch('body_logs',       `${uid}&log_date=eq.${dateStr}`),
   ]);
-  return mergeDay(dateStr, w[0], feelings, f[0], s[0], wt[0], fl[0]);
+  return mergeDay(dateStr, w[0], feelings, f[0], s[0], wt[0], fl[0], body[0]);
 }
 
 async function stLoadAll() {
   try {
     const uid = `user_id=eq.${USER_ID}`;
-    const [workouts, feelings, foods, supps, waters, flares] = await Promise.all([
+    const [workouts, feelings, foods, supps, waters, flares, bodies] = await Promise.all([
       supaFetch('workout_logs',    `${uid}&order=log_date.asc`),
       supaFetch('feeling_logs',    `${uid}&order=logged_at.asc`),
       supaFetch('food_logs',       `${uid}&order=log_date.asc`),
       supaFetch('supplement_logs', `${uid}&order=log_date.asc`),
       supaFetch('water_logs',      `${uid}&order=log_date.asc`),
       supaFetch('flare_logs',      `${uid}&order=log_date.asc`),
+      supaFetch('body_logs',       `${uid}&order=log_date.asc`),
     ]);
     const out = {};
     const ensure = d => { if (!out[d]) { out[d] = defaultEntry(); out[d].date = d; } };
@@ -907,7 +913,8 @@ async function stLoadAll() {
     foods.forEach(r => { ensure(r.log_date); out[r.log_date].food = { meals: r.meals||{}, cheats: r.cheats||{} }; });
     supps.forEach(r => { ensure(r.log_date); out[r.log_date].meds = r.supplements||{}; });
     waters.forEach(r => { ensure(r.log_date); out[r.log_date].water = { total: Number(r.total_oz)||0, log: r.entries||[] }; });
-    flares.forEach(r => { ensure(r.log_date); out[r.log_date].flare = { status: r.status||'good', triggers: r.triggers||[], notes: r.notes||'' }; if (r.weight_lbs != null) out[r.log_date].weight = r.weight_lbs; });
+    flares.forEach(r => { ensure(r.log_date); out[r.log_date].flare = { status: r.status||'good', triggers: r.triggers||[], notes: r.notes||'' }; });
+    bodies.forEach(r => { ensure(r.log_date); if (r.weight_lbs != null) out[r.log_date].weight = r.weight_lbs; });
     return out;
   } catch(e) { return {}; }
 }
@@ -1003,7 +1010,7 @@ function updateHeader() {
 }
 
 function renderAll() {
-  [renderDash, renderWorkout, renderFood, renderMeds, renderWater, renderFlare, renderFeeling, renderWeekPage]
+  [renderDash, renderWorkout, renderFood, renderMeds, renderWater, renderFlare, renderFeeling, renderBody, renderWeekPage]
     .forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
 }
 
@@ -1623,8 +1630,6 @@ function renderFlare() {
       </div>`).join('');
 
   document.getElementById('flareNotes').value = currentEntry.flare.notes || '';
-  const wInput = document.getElementById('weightInput');
-  if (wInput) wInput.value = currentEntry.weight != null ? currentEntry.weight : '';
 }
 
 function setFlare(val) {
@@ -1967,6 +1972,7 @@ async function saveSection(section, silent = false) {
     case 'meds':    return saveMeds(silent);
     case 'water':   return saveWater(silent);
     case 'flare':   return saveFlare(silent);
+    case 'body':    return saveBody(silent);
   }
 }
 
@@ -2021,31 +2027,38 @@ async function saveWater(silent = false) {
   if (res?.ok) { ensureHistory(); allHistory[todayStr].water = currentEntry.water; }
 }
 
-function updateWeight(val) {
-  const parsed = parseFloat(val);
-  currentEntry.weight = isNaN(parsed) ? null : parsed;
-}
-
 async function saveFlare(silent = false) {
   currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
-  const wInput = document.getElementById('weightInput');
-  if (wInput) {
-    const parsed = parseFloat(wInput.value);
-    currentEntry.weight = isNaN(parsed) ? null : parsed;
-  }
   const res = await supaUpsert('flare_logs', {
     user_id: USER_ID, log_date: todayStr,
     status: currentEntry.flare.status,
     triggers: currentEntry.flare.triggers,
     notes: currentEntry.flare.notes,
+    updated_at: new Date().toISOString()
+  });
+  if (res?.ok) { ensureHistory(); allHistory[todayStr].flare = currentEntry.flare; if (!silent) showToast('FLARE SAVED ✓'); }
+  else if (!silent) showToast('SAVE FAILED');
+}
+
+function renderBody() {
+  const input = document.getElementById('bodyWeightInput');
+  if (input) input.value = currentEntry.weight != null ? currentEntry.weight : '';
+}
+
+async function saveBody(silent = false) {
+  const input = document.getElementById('bodyWeightInput');
+  const parsed = input ? parseFloat(input.value) : NaN;
+  currentEntry.weight = isNaN(parsed) ? null : parsed;
+  const res = await supaUpsert('body_logs', {
+    user_id: USER_ID, log_date: todayStr,
     weight_lbs: currentEntry.weight,
     updated_at: new Date().toISOString()
   });
   if (res?.ok) {
     ensureHistory();
-    allHistory[todayStr].flare = currentEntry.flare;
     allHistory[todayStr].weight = currentEntry.weight;
-    if (!silent) showToast('FLARE SAVED ✓');
+    if (!silent) showToast('BODY SAVED ✓');
+    renderDash();
   }
   else if (!silent) showToast('SAVE FAILED');
 }
@@ -2076,7 +2089,7 @@ function switchPage(name, el) {
 }
 
 function switchSection(name, el) {
-  ['workout','food','meds','water','flare','feeling'].forEach(s=>{
+  ['workout','food','meds','water','flare','feeling','body'].forEach(s=>{
     document.getElementById('section-'+s).style.display = s===name ? 'block' : 'none';
   });
   document.querySelectorAll('.stab').forEach(t=>t.className='stab');
