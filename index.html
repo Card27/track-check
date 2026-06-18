@@ -1175,6 +1175,7 @@ async function supaUpsert(table, data) {
   if (USER_ID !== session.user.id) USER_ID = session.user.id;
 
   const { user_id, log_date } = data;
+  console.log('[supaUpsert] user_id:', user_id, 'type:', typeof user_id);
   if (!user_id || !log_date) {
     showErrorModal(`Save failed ${table}: missing user_id or log_date`);
     return { ok: false, err: 'missing user_id or log_date' };
@@ -2397,6 +2398,7 @@ async function saveSection(section, silent = false) {
 async function saveWorkout(silent = false) {
   currentEntry.workout.notes = document.getElementById('workoutNotes')?.value || '';
   const plan = getDayPlan(todayStr) || { type: 'rest' };
+  console.log('[saveWorkout] USER_ID:', USER_ID, 'type:', typeof USER_ID);
   const res = await supaUpsert('workout_logs', {
     user_id: USER_ID, log_date: todayStr, day_type: plan.type,
     exercises: currentEntry.workout.exercises,
@@ -2951,15 +2953,16 @@ async function getOrRefreshSession() {
   if (!stored) return null;
   try {
     const s = JSON.parse(stored);
-    if (s.expires_at && (Date.now() / 1000) < (s.expires_at - 60)) return s;
+    if (s.expires_at && (Date.now() / 1000) < (s.expires_at - 60)) { console.log('[session] valid stored:', JSON.stringify(s)); return s; }
     if (s.refresh_token) {
       const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
         body: JSON.stringify({ refresh_token: s.refresh_token })
       });
-      if (r.ok) { const d = await r.json(); if (d.access_token) return d; }
+      if (r.ok) { const d = await r.json(); if (d.access_token) { console.log('[session] refreshed:', JSON.stringify(d)); return d; } }
     }
+    console.log('[session] null — could not refresh');
     return null;
   } catch(e) { return null; }
 }
