@@ -476,6 +476,22 @@ select:focus{outline:none;border-color:var(--amber)}
 .log-food-main-btn{width:100%;background:var(--amber-glow2);border:1px solid var(--amber);color:var(--amber);padding:11px;border-radius:8px;font-family:var(--font-display);font-size:16px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-bottom:12px;text-align:center}
 .log-food-main-btn:hover{background:var(--amber);color:#080810}
 .log-food-main-btn:active{transform:scale(.98)}
+/* DASH FEELING WIDGET */
+.df-widget{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.df-top{display:flex;align-items:center;justify-content:space-between}
+.df-label{font-family:var(--font-display);font-size:13px;letter-spacing:1px;color:var(--dim)}
+.df-chevron{font-size:14px;color:var(--dim);cursor:pointer;transition:transform .2s;padding:4px 8px;margin-right:-8px;background:none;border:none}
+.df-chevron.open{transform:rotate(180deg)}
+.df-emoji-row{display:flex;justify-content:space-around;margin-top:10px}
+.df-emoji-btn{font-size:28px;border:2px solid transparent;background:transparent;border-radius:10px;padding:5px 8px;cursor:pointer;transition:all .15s;line-height:1}
+.df-emoji-btn.selected{background:rgba(68,136,238,.15);border-color:var(--blue)}
+.df-dims{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+.df-dim-row{margin-bottom:10px}
+.df-dim-label{font-size:11px;color:var(--dim);margin-bottom:5px;font-family:var(--font-display);letter-spacing:1px}
+.df-pip-row{display:flex;gap:3px}
+.df-pip{flex:1;height:26px;border-radius:4px;border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--dim);background:var(--s2);transition:all .15s}
+.df-pip.active{color:#fff;border-color:transparent}
+.df-save-btn{width:100%;background:var(--amber);color:#080810;border:none;padding:10px;border-radius:7px;font-family:var(--font-display);font-size:16px;letter-spacing:2px;cursor:pointer;margin-top:12px}
 /* ── SHEETS ── */
 .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .sheet-overlay.open{display:flex}
@@ -653,6 +669,8 @@ select:focus{outline:none;border-color:var(--amber)}
           </div>
         </div>
       </div>
+
+      <div id="dashFeelingWidget"></div>
 
       <div style="margin-bottom:12px">
         <div class="log-food-main-btn" onclick="goToFoodLog()">🥗 LOG FOOD</div>
@@ -1109,6 +1127,9 @@ let currentEntry = defaultEntry();
 let allHistory = {};
 let currentSection = 'workout';
 let feelingDraft = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null,sleep:null,stiffness:null,subluxations:null,notes:''};
+let dashFeelingExpanded = false;
+let dashFeelingSelected = null;
+let dashFeelingDims = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null};
 let viewingDate = null;
 let viewEntry = null;
 let currentSession = null;
@@ -1568,6 +1589,85 @@ function renderDash() {
     </div>`;
   }
   document.getElementById('energyDashBody').innerHTML = energyDashHtml;
+  renderDashFeelingWidget();
+}
+
+// ═══════════════════════════════════════════════════════
+// DASH FEELING WIDGET
+// ═══════════════════════════════════════════════════════
+
+function renderDashFeelingWidget() {
+  const emojis = ['😣','😕','😐','🙂','😄'];
+  const dims = [
+    {key:'mental',label:'MENTAL'},{key:'physical',label:'PHYSICAL'},
+    {key:'gut',label:'GUT'},{key:'energy',label:'ENERGY'},
+    {key:'clarity',label:'CLARITY'},{key:'stress',label:'STRESS'},
+  ];
+  const emojiRow = emojis.map((e,i) => {
+    const val = i + 1;
+    const sel = dashFeelingSelected === val ? ' selected' : '';
+    return `<button class="df-emoji-btn${sel}" onclick="dashFeelingTapEmoji(${val})">${e}</button>`;
+  }).join('');
+  let html = `<div class="df-widget">
+    <div class="df-top">
+      <div class="df-label">HOW ARE YOU FEELING?</div>
+      <button class="df-chevron${dashFeelingExpanded?' open':''}" onclick="dashFeelingToggle()">▾</button>
+    </div>
+    <div class="df-emoji-row">${emojiRow}</div>`;
+  if (dashFeelingExpanded) {
+    const dimRows = dims.map(dim => {
+      const val = dashFeelingDims[dim.key];
+      const pips = Array.from({length:10},(_,i) => {
+        const n = i + 1;
+        const active = val === n;
+        const style = active ? `background:${PIP_COLORS[n]};border-color:${PIP_COLORS[n]}` : '';
+        return `<div class="df-pip${active?' active':''}" style="${style}" onclick="dashFeelingSetDim('${dim.key}',${n})">${n}</div>`;
+      }).join('');
+      return `<div class="df-dim-row"><div class="df-dim-label">${dim.label}</div><div class="df-pip-row">${pips}</div></div>`;
+    }).join('');
+    html += `<div class="df-dims">${dimRows}<button class="df-save-btn" onclick="dashFeelingSave()">SAVE</button></div>`;
+  }
+  html += `</div>`;
+  document.getElementById('dashFeelingWidget').innerHTML = html;
+}
+
+function dashFeelingToggle() {
+  dashFeelingExpanded = !dashFeelingExpanded;
+  renderDashFeelingWidget();
+}
+
+async function dashFeelingTapEmoji(val) {
+  dashFeelingSelected = val;
+  renderDashFeelingWidget();
+  await supaInsert('feeling_logs', {
+    user_id: USER_ID, log_date: todayStr,
+    logged_at: new Date().toISOString(),
+    overall_score: val,
+    mental: null, physical: null, gut: null, energy: null, clarity: null, stress: null,
+    sleep_quality: null, stiffness_minutes: null, subluxations: null, notes: null
+  });
+  showToast('FEELING LOGGED ✓');
+}
+
+function dashFeelingSetDim(key, val) {
+  dashFeelingDims[key] = val;
+  renderDashFeelingWidget();
+}
+
+async function dashFeelingSave() {
+  const d = dashFeelingDims;
+  await supaInsert('feeling_logs', {
+    user_id: USER_ID, log_date: todayStr,
+    logged_at: new Date().toISOString(),
+    overall_score: null,
+    mental: d.mental, physical: d.physical, gut: d.gut,
+    energy: d.energy, clarity: d.clarity, stress: d.stress,
+    sleep_quality: null, stiffness_minutes: null, subluxations: null, notes: null
+  });
+  dashFeelingExpanded = false;
+  dashFeelingDims = {mental:null,physical:null,gut:null,energy:null,clarity:null,stress:null};
+  renderDashFeelingWidget();
+  showToast('FEELING SAVED ✓');
 }
 
 function foodEntries() {
