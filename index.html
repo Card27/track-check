@@ -3320,9 +3320,9 @@ function renderRecipeBuilder() {
     <div class="ex-field">
       <label>HOW MANY SERVINGS DOES THIS MAKE?</label>
       <input type="number" inputmode="numeric" min="1" class="auth-input" id="rbServings" value="${s.servings}"
-        oninput="recipeState.servings=parseInt(this.value)||1;renderRecipeBuilder()">
+        oninput="updateYieldDisplay(this.value)">
     </div>
-    ${tot.cal>0?`<div style="font-size:12px;color:var(--dim);margin-top:6px">Per serving: ${ps.cal} cal · ${ps.protein}g P · ${ps.carbs}g C · ${ps.fat}g F</div>`:''}
+    <div id="rbPerServingText" style="font-size:12px;color:var(--dim);margin-top:6px">${tot.cal>0?`Per serving: ${ps.cal} cal · ${ps.protein}g P · ${ps.carbs}g C · ${ps.fat}g F`:''}</div>
   </div>`;
 
   // Step 4 / Log Now
@@ -3350,6 +3350,17 @@ function renderRecipeBuilder() {
   }
 
   document.getElementById('rbContent').innerHTML = html;
+}
+
+function updateYieldDisplay(val) {
+  const sv = Math.max(1, parseInt(val) || 1);
+  recipeState.servings = sv;
+  const s = recipeState;
+  const tot = s.ingredients.reduce((a,i)=>({cal:a.cal+(i.cal||0),protein:a.protein+(i.protein||0),carbs:a.carbs+(i.carbs||0),fat:a.fat+(i.fat||0)}),{cal:0,protein:0,carbs:0,fat:0});
+  const el = document.getElementById('rbPerServingText');
+  if (el) el.textContent = tot.cal > 0
+    ? `Per serving: ${Math.round(tot.cal/sv)} cal · ${Math.round(tot.protein/sv*10)/10}g P · ${Math.round(tot.carbs/sv*10)/10}g C · ${Math.round(tot.fat/sv*10)/10}g F`
+    : '';
 }
 
 async function saveAndLogRecipe() {
