@@ -2629,10 +2629,10 @@ async function saveFood(silent = false) {
   const res = await supaUpsert('food_logs', {
     user_id: USER_ID, log_date: todayStr,
     meals: currentEntry.food.meals, cheats: currentEntry.food.cheats,
-    total_calories: Math.round(entries.reduce((s,e)=>s+(e.cal    ||0),0)),
-    total_protein:  Math.round(entries.reduce((s,e)=>s+(e.protein ||0),0)*10)/10,
-    total_carbs:    Math.round(entries.reduce((s,e)=>s+(e.carbs   ||0),0)*10)/10,
-    total_fat:      Math.round(entries.reduce((s,e)=>s+(e.fat     ||0),0)*10)/10,
+    total_calories: parseFloat(Math.round(entries.reduce((s,e)=>s+(e.cal    ||0),0))),
+    total_protein:  parseFloat(Math.round(entries.reduce((s,e)=>s+(e.protein ||0),0)*10)/10),
+    total_carbs:    parseFloat(Math.round(entries.reduce((s,e)=>s+(e.carbs   ||0),0)*10)/10),
+    total_fat:      parseFloat(Math.round(entries.reduce((s,e)=>s+(e.fat     ||0),0)*10)/10),
     updated_at: new Date().toISOString()
   });
   if (res?.ok) { ensureHistory(); allHistory[todayStr].food = currentEntry.food; if (!silent) showToast('FOOD SAVED ✓'); }
