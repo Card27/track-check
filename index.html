@@ -337,6 +337,62 @@ select:focus{outline:none;border-color:var(--amber)}
 .cond-check{width:20px;height:20px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .15s}
 .cond-check.checked{background:var(--green);border-color:var(--green);color:#000;font-weight:700}
 .cond-name{font-size:13px;font-weight:600;flex:1}
+
+/* ── NUTRITION ── */
+.macro-pill{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;flex:1;min-width:0}
+.macro-pill-lbl{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.macro-pill-val{font-family:var(--font-mono);font-size:12px;color:var(--text);line-height:1.2;margin-top:1px}
+.macro-pill-bar{height:3px;border-radius:2px;background:var(--s4);margin-top:5px;overflow:hidden}
+.macro-pill-fill{height:100%;border-radius:2px;transition:width .4s}
+.meal-group{margin-bottom:10px}
+.meal-group-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.meal-group-lbl{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;flex:1}
+.meal-add-btn{font-size:10px;font-weight:700;color:var(--amber);border:1px solid rgba(221,34,34,.4);background:var(--amber-glow);border-radius:5px;padding:4px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.logged-item{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:border-color .15s}
+.logged-item:active{border-color:var(--amber)}
+.logged-item-info{flex:1;min-width:0}
+.logged-item-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logged-item-macros{font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-top:2px}
+.logged-item-del{color:var(--muted);font-size:20px;line-height:1;flex-shrink:0;padding:0 2px}
+.inflam-badge{background:rgba(224,68,68,.12);border:1px solid rgba(224,68,68,.3);color:var(--red);font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:2px}
+.log-food-main-btn{width:100%;background:var(--amber-glow2);border:1px solid var(--amber);color:var(--amber);padding:11px;border-radius:8px;font-family:var(--font-display);font-size:16px;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-bottom:12px;text-align:center}
+.log-food-main-btn:hover{background:var(--amber);color:#080810}
+.log-food-main-btn:active{transform:scale(.98)}
+/* ── SHEETS ── */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.sheet-overlay.open{display:flex}
+#foodSearchSheet,#foodDetailSheet{z-index:210}
+.sheet{background:var(--s1);border-radius:14px 14px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 24px rgba(0,0,0,.5)}
+.sheet-drag{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0;flex-shrink:0}
+.sheet-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sheet-title{font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--amber);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--dim);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sheet-body{overflow-y:auto;flex:1;padding:12px 14px 24px}
+.sheet-body::-webkit-scrollbar{width:3px}
+.sheet-body::-webkit-scrollbar-thumb{background:var(--border)}
+.search-bar{display:flex;gap:8px;margin-bottom:10px;position:sticky;top:0;background:var(--s1);padding:2px 0 6px;z-index:1}
+.search-input{flex:1;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--font-body);font-size:14px}
+.search-input:focus{outline:none;border-color:var(--amber)}
+.food-result{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color .15s}
+.food-result:active{border-color:var(--amber)}
+.food-result-info{flex:1;min-width:0}
+.food-result-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.food-result-cal{font-family:var(--font-mono);font-size:10px;color:var(--dim);margin-top:2px}
+.food-result-src{font-size:9px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.unit-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.unit-chip{padding:5px 11px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer;transition:all .15s}
+.unit-chip.sel{background:var(--amber-glow2);border-color:var(--amber);color:var(--amber)}
+.slot-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.slot-chip{padding:5px 13px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer;transition:all .15s}
+.slot-chip.sel{background:var(--amber-glow2);border-color:var(--amber);color:var(--amber)}
+.macro-preview{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:12px}
+.mp-item{text-align:center}
+.mp-val{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--text)}
+.mp-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.recipe-step{margin-bottom:14px}
+.recipe-step-hdr{font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.recipe-ing-item{background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;margin-bottom:5px;display:flex;align-items:center;gap:8px;font-size:12px}
+.recipe-ing-del{margin-left:auto;color:var(--dim);cursor:pointer;font-size:18px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -480,6 +536,10 @@ select:focus{outline:none;border-color:var(--amber)}
         </div>
       </div>
 
+      <div style="margin-bottom:12px">
+        <div class="log-food-main-btn" onclick="goToFoodLog()">🥗 LOG FOOD</div>
+      </div>
+
       <div class="card">
         <div class="card-hdr">
           <div class="card-icon">📋</div>
@@ -531,8 +591,9 @@ select:focus{outline:none;border-color:var(--amber)}
 
       <!-- FOOD SECTION -->
       <div id="section-food" style="display:none">
-        <div id="mealList"></div>
-
+        <div class="log-food-main-btn" onclick="openFoodSearch(null)">+ LOG FOOD</div>
+        <div id="nutritionTotalsBar" style="display:flex;gap:6px;margin-bottom:12px"></div>
+        <div id="mealGroups"></div>
         <div class="card" style="margin-top:4px">
           <div class="card-hdr">
             <div class="card-icon">🍕</div>
@@ -543,7 +604,6 @@ select:focus{outline:none;border-color:var(--amber)}
             <div class="cheat-grid" id="cheatGrid"></div>
           </div>
         </div>
-        <button class="save-btn" onclick="saveSection('food')">SAVE FOOD LOG</button>
       </div>
 
       <!-- MEDS SECTION -->
@@ -718,6 +778,74 @@ select:focus{outline:none;border-color:var(--amber)}
   </div>
 </div>
 
+<!-- FOOD SEARCH SHEET -->
+<div id="foodSearchSheet" class="sheet-overlay">
+  <div class="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-hdr">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-title">SEARCH FOOD</div>
+        <div id="fsSlotHint" style="font-size:10px;color:var(--dim);margin-top:1px"></div>
+      </div>
+      <div class="sheet-close" onclick="closeFoodSearch()">×</div>
+    </div>
+    <div class="sheet-body">
+      <div class="search-bar">
+        <input class="search-input" id="fsInput" type="text" placeholder="Chicken breast, oats, banana..."
+          oninput="clearTimeout(window._fsTimer);window._fsTimer=setTimeout(()=>doFoodSearch(this.value),350)">
+      </div>
+      <div id="fsResults"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOD DETAIL SHEET -->
+<div id="foodDetailSheet" class="sheet-overlay">
+  <div class="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-hdr">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-title" id="fdFoodName"></div>
+        <div id="fdInflam" class="inflam-badge" style="display:none;margin-top:3px">⚠ Inflammatory</div>
+      </div>
+      <div class="sheet-close" onclick="closeFoodDetail()">×</div>
+    </div>
+    <div class="sheet-body">
+      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">UNIT</div>
+      <div class="unit-row" id="fdUnits"></div>
+      <div class="ex-field" style="margin-bottom:12px">
+        <label>AMOUNT</label>
+        <input type="number" inputmode="decimal" step="any" id="fdServings" class="auth-input" placeholder="100"
+          oninput="updateDetailServings(this.value)">
+      </div>
+      <div id="fdSlotsWrap">
+        <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">MEAL</div>
+        <div class="slot-row" id="fdSlots"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">MACROS</div>
+      <div class="macro-preview" style="margin-bottom:16px">
+        <div class="mp-item"><div class="mp-val" id="fdCalVal">0</div><div class="mp-lbl">Cal</div></div>
+        <div class="mp-item"><div class="mp-val" id="fdProVal">0g</div><div class="mp-lbl">Protein</div></div>
+        <div class="mp-item"><div class="mp-val" id="fdCarbVal">0g</div><div class="mp-lbl">Carbs</div></div>
+        <div class="mp-item"><div class="mp-val" id="fdFatVal">0g</div><div class="mp-lbl">Fat</div></div>
+      </div>
+      <button class="save-btn" id="fdLogBtn" onclick="handleLogOrAddIngredient()">LOG IT</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECIPE BUILDER SHEET -->
+<div id="recipeBuilderSheet" class="sheet-overlay">
+  <div class="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-hdr">
+      <div class="sheet-title">RECIPE BUILDER</div>
+      <div class="sheet-close" onclick="closeRecipeBuilder()">×</div>
+    </div>
+    <div class="sheet-body" id="rbContent"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast">SAVED ✓</div>
 
 <script>
@@ -870,6 +998,19 @@ let currentProfile = null;
 let signupEmail = '';
 let signupPassword = '';
 let profileUnit = 'lbs';
+
+// ── FOOD / NUTRITION STATE
+let fsSlot = null;
+let fsSelected = null;
+let fsUnit = 'g';
+let fsServings = 100;
+let fsDetailSlot = 'breakfast';
+let rbAddingIngredient = false;
+let recipeState = {name:'', ingredients:[], servings:1, step:1, _saved:false, _savedRecipe:null, _logServings:1};
+const UNIT_WEIGHTS = {g:1, oz:28.35, cup:240, tbsp:15, tsp:5, ml:1, piece:100, slice:30, serving:100};
+const TARGET_CAL = 1600, TARGET_PRO = 190, TARGET_CARB = 150, TARGET_FAT = 60;
+const MEAL_SLOTS = ['breakfast','lunch','dinner','snacks'];
+const SLOT_LABELS = {breakfast:'BREAKFAST', lunch:'LUNCH', dinner:'DINNER', snacks:'SNACKS'};
 
 function defaultEntry() {
   return {
@@ -1261,15 +1402,17 @@ function renderDash() {
   document.getElementById('energyDashBody').innerHTML = energyDashHtml;
 }
 
+function foodEntries() {
+  const m = currentEntry.food.meals;
+  return Array.isArray(m?.entries) ? m.entries : [];
+}
+
 function calcTodayCals() {
-  let total = 0;
-  for(const [id, done] of Object.entries(currentEntry.food.meals)) {
-    if(done) {
-      const meal = MEALS.find(m=>m.id===id);
-      if(meal) total += meal.cal;
-    }
-  }
-  return total;
+  return Math.round(foodEntries().reduce((s,e)=>s+(e.cal||0),0));
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1518,64 +1661,65 @@ function toggleStab(id) {
 // ═══════════════════════════════════════════════════════
 
 function renderFood() {
-  const dow = getDow(todayStr);
-  const isEggDay = dow === 3 || dow === 5;
+  const entries = foodEntries();
 
-  // Filter meals for today
-  const todayMeals = MEALS.filter(m => {
-    if(m.id === 'lunch_a') return !isEggDay;
-    if(m.id === 'lunch_b') return isEggDay;
-    if(m.id === 'dinner_chicken' || m.id === 'dinner_pork') return true;
-    return true;
-  });
+  // Totals bar
+  const totalCal  = Math.round(entries.reduce((s,e)=>s+(e.cal     ||0),0));
+  const totalPro  = Math.round(entries.reduce((s,e)=>s+(e.protein  ||0),0) * 10) / 10;
+  const totalCarb = Math.round(entries.reduce((s,e)=>s+(e.carbs    ||0),0) * 10) / 10;
+  const totalFat  = Math.round(entries.reduce((s,e)=>s+(e.fat      ||0),0) * 10) / 10;
 
-  // Group
-  const groups = {};
-  todayMeals.forEach(m => {
-    const g = m.label.split(' ')[0];
-    if(!groups[g]) groups[g] = [];
-    groups[g].push(m);
-  });
+  document.getElementById('nutritionTotalsBar').innerHTML = `
+    <div class="macro-pill">
+      <div class="macro-pill-lbl">Calories</div>
+      <div class="macro-pill-val">${totalCal}<span style="color:var(--dim);font-size:9px"> /${TARGET_CAL}</span></div>
+      <div class="macro-pill-bar"><div class="macro-pill-fill" style="width:${Math.min(totalCal/TARGET_CAL*100,100)}%;background:var(--amber)"></div></div>
+    </div>
+    <div class="macro-pill">
+      <div class="macro-pill-lbl">Protein</div>
+      <div class="macro-pill-val">${totalPro}g<span style="color:var(--dim);font-size:9px"> /${TARGET_PRO}</span></div>
+      <div class="macro-pill-bar"><div class="macro-pill-fill" style="width:${Math.min(totalPro/TARGET_PRO*100,100)}%;background:var(--blue)"></div></div>
+    </div>
+    <div class="macro-pill">
+      <div class="macro-pill-lbl">Carbs</div>
+      <div class="macro-pill-val">${totalCarb}g</div>
+      <div class="macro-pill-bar"><div class="macro-pill-fill" style="width:${Math.min(totalCarb/TARGET_CARB*100,100)}%;background:var(--green)"></div></div>
+    </div>
+    <div class="macro-pill">
+      <div class="macro-pill-lbl">Fat</div>
+      <div class="macro-pill-val">${totalFat}g</div>
+      <div class="macro-pill-bar"><div class="macro-pill-fill" style="width:${Math.min(totalFat/TARGET_FAT*100,100)}%;background:var(--purple)"></div></div>
+    </div>`;
 
-  let html = '';
-  for(const [grp, meals] of Object.entries(groups)) {
-    html += `<div class="meal-section">`;
-    html += `<div class="meal-label">${grp}</div>`;
-    meals.forEach(m => {
-      const done = currentEntry.food.meals[m.id];
-      html += `<div class="meal-item${done?' done':''}" onclick="toggleMeal('${m.id}')">
-        <div class="meal-check">${done?'✓':''}</div>
-        <div class="meal-info">
-          <div class="meal-name">${m.name} <span style="color:var(--muted);font-size:10px;font-weight:400">${m.time}</span></div>
-          <div class="meal-desc">${m.desc}</div>
-          <div class="meal-macros">${m.cal} cal · ${m.pro}g protein · ${m.carb}g carb · ${m.fat}g fat</div>
-        </div>
+  // Meal groups
+  let groupsHtml = '';
+  MEAL_SLOTS.forEach(slot => {
+    const slotEntries = entries.filter(e => e.meal_slot === slot);
+    groupsHtml += `<div class="meal-group">
+      <div class="meal-group-hdr">
+        <div class="meal-group-lbl">${SLOT_LABELS[slot]}</div>
+        <div class="meal-add-btn" onclick="openFoodSearch('${slot}')">+ ADD</div>
       </div>`;
-    });
-    html += `</div>`;
-  }
+    if (!slotEntries.length) {
+      groupsHtml += `<div style="font-size:12px;color:var(--dim);padding:3px 0 6px">Nothing logged</div>`;
+    } else {
+      slotEntries.forEach(item => {
+        const gIdx = entries.indexOf(item);
+        groupsHtml += `<div class="logged-item" onclick="tapLoggedItem(${gIdx})">
+          <div class="logged-item-info">
+            <div class="logged-item-name">${escHtml(item.name)}</div>
+            <div class="logged-item-macros">${item.servings}${item.unit} · ${Math.round(item.cal||0)} cal · ${Math.round(item.protein||0)}g P · ${Math.round(item.carbs||0)}g C · ${Math.round(item.fat||0)}g F</div>
+          </div>
+          ${(item.inflammatory_score||0)>0?'<div class="inflam-badge">⚠ Inflam</div>':''}
+          <div class="logged-item-del" onclick="event.stopPropagation();deleteLoggedFood(${gIdx})">×</div>
+        </div>`;
+      });
+    }
+    groupsHtml += `</div>`;
+  });
+  document.getElementById('mealGroups').innerHTML = groupsHtml;
 
-  // Cal summary
-  const calLogged = calcTodayCals();
-  const proLogged = todayMeals.filter(m=>currentEntry.food.meals[m.id]).reduce((s,m)=>s+m.pro,0);
-  const pct = Math.min(calLogged/1600*100, 100);
-  html += `<div class="cal-summary">
-    <div class="cal-item">Logged: <strong>${calLogged}</strong> cal</div>
-    <div class="cal-item">Protein: <strong>${proLogged}g</strong></div>
-    <div class="cal-item" style="color:${1600-calLogged<0?'var(--red)':''}">Buffer: <strong>${1600-calLogged}</strong></div>
-    <div class="cal-bar-wrap"><div class="cal-bar-bg"><div class="cal-bar-fill" style="width:${pct}%"></div></div></div>
-  </div>`;
-
-  document.getElementById('mealList').innerHTML = html;
-
-  // Cheats
   renderCheats();
-}
-
-function toggleMeal(id) {
-  currentEntry.food.meals[id] = !currentEntry.food.meals[id];
-  renderFood();
-  renderDash();
 }
 
 function renderCheats() {
@@ -2105,21 +2249,477 @@ async function saveWorkout(silent = false) {
 }
 
 async function saveFood(silent = false) {
-  const dow = getDow(todayStr);
-  const isEggDay = dow === 3 || dow === 5;
-  const todayMeals = MEALS.filter(m => { if(m.id==='lunch_a') return !isEggDay; if(m.id==='lunch_b') return isEggDay; return true; });
-  const done = todayMeals.filter(m => currentEntry.food.meals[m.id]);
+  const entries = foodEntries();
   const res = await supaUpsert('food_logs', {
     user_id: USER_ID, log_date: todayStr,
     meals: currentEntry.food.meals, cheats: currentEntry.food.cheats,
-    total_calories: done.reduce((s,m)=>s+m.cal,0),
-    total_protein:  done.reduce((s,m)=>s+m.pro,0),
-    total_carbs:    done.reduce((s,m)=>s+m.carb,0),
-    total_fat:      done.reduce((s,m)=>s+m.fat,0),
+    total_calories: Math.round(entries.reduce((s,e)=>s+(e.cal    ||0),0)),
+    total_protein:  Math.round(entries.reduce((s,e)=>s+(e.protein ||0),0)*10)/10,
+    total_carbs:    Math.round(entries.reduce((s,e)=>s+(e.carbs   ||0),0)*10)/10,
+    total_fat:      Math.round(entries.reduce((s,e)=>s+(e.fat     ||0),0)*10)/10,
     updated_at: new Date().toISOString()
   });
   if (res?.ok) { ensureHistory(); allHistory[todayStr].food = currentEntry.food; if (!silent) showToast('FOOD SAVED ✓'); }
   else if (!silent) showToast('SAVE FAILED');
+}
+
+// ═══════════════════════════════════════════════════════
+// NUTRITION — HELPERS
+// ═══════════════════════════════════════════════════════
+
+function scoreFoodInflammation(name) {
+  const n = (name || '').toLowerCase();
+  const rules = [
+    {score:3, terms:['alcohol','trans fat','partially hydrogenated']},
+    {score:2, terms:['sugar','white flour','processed cheese','deli meat']},
+    {score:1, terms:['vegetable oil','canola oil','sunflower oil','corn oil']},
+  ];
+  for (const r of rules) {
+    const hit = r.terms.filter(t => n.includes(t));
+    if (hit.length) return {score: r.score, flags: hit};
+  }
+  return {score:0, flags:[]};
+}
+
+function calcMacrosForEntry(food, unit, servings) {
+  const weightG = (UNIT_WEIGHTS[unit] || 1) * servings;
+  const f = weightG / 100;
+  return {
+    cal:     Math.round((food.cal_per_100g     || 0) * f),
+    protein: Math.round((food.protein_per_100g || 0) * f * 10) / 10,
+    carbs:   Math.round((food.carbs_per_100g   || 0) * f * 10) / 10,
+    fat:     Math.round((food.fat_per_100g     || 0) * f * 10) / 10,
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+// NUTRITION — FOOD SEARCH SHEET
+// ═══════════════════════════════════════════════════════
+
+function openFoodSearch(slot) {
+  fsSlot = slot;
+  const el = document.getElementById('fsSlotHint');
+  if (el) el.textContent = slot ? 'Adding to ' + slot.charAt(0).toUpperCase() + slot.slice(1) : '';
+  document.getElementById('fsInput').value = '';
+  document.getElementById('fsResults').innerHTML = '';
+  document.getElementById('foodSearchSheet').classList.add('open');
+  setTimeout(() => document.getElementById('fsInput').focus(), 120);
+}
+
+function closeFoodSearch() {
+  document.getElementById('foodSearchSheet').classList.remove('open');
+}
+
+async function doFoodSearch(term) {
+  if (!term || term.length < 2) { document.getElementById('fsResults').innerHTML = ''; return; }
+  document.getElementById('fsResults').innerHTML = '<div class="empty-state">Searching...</div>';
+  const [prev, cached, live] = await Promise.all([
+    fetchPrevFoods(term), fetchCachedFoods(term), fetchLiveFoods(term)
+  ]);
+  const seen = new Set();
+  const dedup = arr => arr.filter(f => { const k = f.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  window._fsResults = [...dedup(prev), ...dedup(cached), ...dedup(live)];
+  renderSearchResults(window._fsResults, term);
+}
+
+function renderSearchResults(results) {
+  let html = `<div class="food-result" style="border-color:var(--purple);margin-bottom:10px" onclick="openRecipeBuilder()">
+    <div class="food-result-info">
+      <div class="food-result-name" style="color:var(--purple)">+ Create Recipe</div>
+      <div class="food-result-cal">Build a custom recipe from ingredients</div>
+    </div>
+  </div>`;
+  if (!results.length) {
+    html += '<div class="empty-state" style="padding:20px 0">No results found.</div>';
+  } else {
+    results.forEach((f, i) => {
+      html += `<div class="food-result" onclick="selectSearchResult(${i})">
+        <div class="food-result-info">
+          <div class="food-result-name">${escHtml(f.name)}</div>
+          <div class="food-result-cal">${Math.round(f.cal_per_100g||0)} cal/100g · P ${Math.round(f.protein_per_100g||0)}g · C ${Math.round(f.carbs_per_100g||0)}g · F ${Math.round(f.fat_per_100g||0)}g</div>
+        </div>
+        ${(f.inflammatory_score||0)>0?'<div class="inflam-badge">⚠</div>':''}
+        <div class="food-result-src">${f._source||''}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('fsResults').innerHTML = html;
+}
+
+function selectSearchResult(idx) {
+  const food = (window._fsResults || [])[idx];
+  if (!food) return;
+  if (food._source === 'USDA' || food._source === 'OFF') cacheFoodToSupabase(food);
+  openFoodDetail(food, fsSlot);
+}
+
+async function fetchPrevFoods(term) {
+  try {
+    const rows = await supaFetch('food_logs', `user_id=eq.${USER_ID}&order=log_date.desc&limit=30`);
+    const seen = new Set(); const foods = [];
+    rows.forEach(row => {
+      (row.meals?.entries || []).forEach(e => {
+        if (seen.has(e.name) || !e.name.toLowerCase().includes(term.toLowerCase())) return;
+        seen.add(e.name);
+        const wG = (UNIT_WEIGHTS[e.unit]||1) * e.servings;
+        const fac = wG > 0 ? 100 / wG : 0;
+        foods.push({
+          id: e.food_id, name: e.name,
+          cal_per_100g:     Math.round((e.cal     ||0)*fac),
+          protein_per_100g: Math.round((e.protein ||0)*fac*10)/10,
+          carbs_per_100g:   Math.round((e.carbs   ||0)*fac*10)/10,
+          fat_per_100g:     Math.round((e.fat     ||0)*fac*10)/10,
+          inflammatory_score: e.inflammatory_score||0,
+          _source: 'RECENT',
+        });
+      });
+    });
+    return foods;
+  } catch(e) { return []; }
+}
+
+async function fetchCachedFoods(term) {
+  try {
+    const rows = await supaFetch('foods', `name=ilike.*${encodeURIComponent(term)}*&limit=10`);
+    return rows.map(f => ({...f, _source:'DB'}));
+  } catch(e) { return []; }
+}
+
+async function fetchLiveFoods(term) {
+  try {
+    const [uR, oR] = await Promise.allSettled([
+      fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(term)}&api_key=DEMO_KEY&pageSize=5`).then(r=>r.json()),
+      fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=5`).then(r=>r.json()),
+    ]);
+    const results = [];
+    if (uR.status==='fulfilled' && uR.value?.foods) {
+      uR.value.foods.slice(0,5).forEach(f => {
+        const gn = id => f.foodNutrients?.find(n=>n.nutrientId===id)?.value||0;
+        const {score,flags} = scoreFoodInflammation(f.description);
+        results.push({external_id:'usda_'+f.fdcId, name:f.description,
+          cal_per_100g:gn(1008), protein_per_100g:gn(1003), carbs_per_100g:gn(1005), fat_per_100g:gn(1004),
+          inflammatory_score:score, inflammatory_flags:flags, _source:'USDA'});
+      });
+    }
+    if (oR.status==='fulfilled' && oR.value?.products) {
+      oR.value.products.slice(0,5).forEach(p => {
+        if (!p.product_name) return;
+        const n = p.nutriments||{};
+        const {score,flags} = scoreFoodInflammation(p.product_name);
+        results.push({external_id:'off_'+p.id, name:p.product_name,
+          cal_per_100g:n['energy-kcal_100g']||0, protein_per_100g:n['proteins_100g']||0,
+          carbs_per_100g:n['carbohydrates_100g']||0, fat_per_100g:n['fat_100g']||0,
+          inflammatory_score:score, inflammatory_flags:flags, _source:'OFF'});
+      });
+    }
+    return results;
+  } catch(e) { return []; }
+}
+
+async function cacheFoodToSupabase(food) {
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/foods`, {
+      method:'POST',
+      headers:{...getHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify({
+        external_id:food.external_id, name:food.name,
+        source:food._source==='USDA'?'usda':'off',
+        cal_per_100g:food.cal_per_100g, protein_per_100g:food.protein_per_100g,
+        carbs_per_100g:food.carbs_per_100g, fat_per_100g:food.fat_per_100g,
+        inflammatory_score:food.inflammatory_score||0,
+        inflammatory_flags:food.inflammatory_flags||[],
+      })
+    });
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════
+// NUTRITION — FOOD DETAIL SHEET
+// ═══════════════════════════════════════════════════════
+
+function openFoodDetail(food, slot) {
+  fsSelected = food;
+  fsUnit = 'g';
+  fsServings = 100;
+  fsDetailSlot = slot || fsSlot || 'breakfast';
+
+  document.getElementById('fdFoodName').textContent = food.name;
+  document.getElementById('fdInflam').style.display = (food.inflammatory_score||0)>0 ? 'inline-flex' : 'none';
+  document.getElementById('fdServings').value = fsServings;
+  document.getElementById('fdSlotsWrap').style.display = rbAddingIngredient ? 'none' : '';
+  document.getElementById('fdLogBtn').textContent = rbAddingIngredient ? 'ADD TO RECIPE' : 'LOG IT';
+  renderDetailUnits();
+  renderDetailSlots();
+  renderDetailMacros();
+  closeFoodSearch();
+  document.getElementById('foodDetailSheet').classList.add('open');
+}
+
+function closeFoodDetail() {
+  document.getElementById('foodDetailSheet').classList.remove('open');
+  document.getElementById('fdSlotsWrap').style.display = '';
+  document.getElementById('fdLogBtn').textContent = 'LOG IT';
+  rbAddingIngredient = false;
+}
+
+function renderDetailUnits() {
+  document.getElementById('fdUnits').innerHTML =
+    ['g','oz','cup','tbsp','tsp','ml','piece','slice','serving'].map(u =>
+      `<div class="unit-chip${fsUnit===u?' sel':''}" onclick="setDetailUnit('${u}')">${u}</div>`
+    ).join('');
+}
+
+function renderDetailSlots() {
+  document.getElementById('fdSlots').innerHTML = MEAL_SLOTS.map(s =>
+    `<div class="slot-chip${fsDetailSlot===s?' sel':''}" onclick="setDetailSlot('${s}')">${SLOT_LABELS[s]}</div>`
+  ).join('');
+}
+
+function renderDetailMacros() {
+  const m = calcMacrosForEntry(fsSelected, fsUnit, fsServings);
+  document.getElementById('fdCalVal').textContent  = m.cal;
+  document.getElementById('fdProVal').textContent  = m.protein + 'g';
+  document.getElementById('fdCarbVal').textContent = m.carbs + 'g';
+  document.getElementById('fdFatVal').textContent  = m.fat + 'g';
+}
+
+function setDetailUnit(u) { fsUnit = u; renderDetailUnits(); renderDetailMacros(); }
+function setDetailSlot(s) { fsDetailSlot = s; renderDetailSlots(); }
+function updateDetailServings(val) { fsServings = parseFloat(val) || 0; renderDetailMacros(); }
+
+function handleLogOrAddIngredient() {
+  if (rbAddingIngredient) addRecipeIngredient();
+  else logFood();
+}
+
+async function logFood() {
+  if (!fsSelected || !fsServings) return;
+  const m = calcMacrosForEntry(fsSelected, fsUnit, fsServings);
+  if (!currentEntry.food.meals || typeof currentEntry.food.meals !== 'object') currentEntry.food.meals = {};
+  if (!Array.isArray(currentEntry.food.meals.entries)) currentEntry.food.meals.entries = [];
+  currentEntry.food.meals.entries.push({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    food_id: fsSelected.id || null,
+    name: fsSelected.name,
+    meal_slot: fsDetailSlot,
+    unit: fsUnit,
+    servings: fsServings,
+    cal: m.cal, protein: m.protein, carbs: m.carbs, fat: m.fat,
+    inflammatory_score: fsSelected.inflammatory_score || 0,
+  });
+  closeFoodDetail();
+  await saveFood(true);
+  renderFood();
+  renderDash();
+  showToast('FOOD LOGGED ✓');
+}
+
+function deleteLoggedFood(idx) {
+  const entries = currentEntry.food.meals?.entries;
+  if (!Array.isArray(entries)) return;
+  entries.splice(idx, 1);
+  saveFood(true);
+  renderFood();
+  renderDash();
+}
+
+function tapLoggedItem(idx) {
+  const entries = currentEntry.food.meals?.entries;
+  if (!Array.isArray(entries)) return;
+  const item = entries[idx];
+  if (!item) return;
+  const wG = (UNIT_WEIGHTS[item.unit]||1) * item.servings;
+  const fac = wG > 0 ? 100 / wG : 0;
+  const food = {
+    id: item.food_id, name: item.name,
+    cal_per_100g:     Math.round((item.cal     ||0)*fac),
+    protein_per_100g: Math.round((item.protein ||0)*fac*10)/10,
+    carbs_per_100g:   Math.round((item.carbs   ||0)*fac*10)/10,
+    fat_per_100g:     Math.round((item.fat     ||0)*fac*10)/10,
+    inflammatory_score: item.inflammatory_score||0,
+  };
+  entries.splice(idx, 1);
+  saveFood(true);
+  renderFood();
+  fsUnit = item.unit;
+  fsServings = item.servings;
+  fsDetailSlot = item.meal_slot;
+  openFoodDetail(food, item.meal_slot);
+  document.getElementById('fdServings').value = item.servings;
+  setDetailUnit(item.unit);
+}
+
+// ═══════════════════════════════════════════════════════
+// NUTRITION — RECIPE BUILDER
+// ═══════════════════════════════════════════════════════
+
+function openRecipeBuilder() {
+  recipeState = {name:'', ingredients:[], servings:1, _saved:false, _savedRecipe:null, _logServings:1};
+  closeFoodSearch();
+  document.getElementById('recipeBuilderSheet').classList.add('open');
+  renderRecipeBuilder();
+}
+
+function closeRecipeBuilder() {
+  rbAddingIngredient = false;
+  document.getElementById('recipeBuilderSheet').classList.remove('open');
+}
+
+function openRecipeIngredientSearch() {
+  rbAddingIngredient = true;
+  document.getElementById('fsSlotHint').textContent = 'Adding recipe ingredient';
+  document.getElementById('fsInput').value = '';
+  document.getElementById('fsResults').innerHTML = '';
+  document.getElementById('foodSearchSheet').classList.add('open');
+  setTimeout(() => document.getElementById('fsInput').focus(), 120);
+}
+
+function addRecipeIngredient() {
+  if (!fsSelected) return;
+  const m = calcMacrosForEntry(fsSelected, fsUnit, fsServings);
+  recipeState.ingredients.push({
+    food_id: fsSelected.id||null, name: fsSelected.name,
+    unit: fsUnit, servings: fsServings,
+    cal: m.cal, protein: m.protein, carbs: m.carbs, fat: m.fat,
+    inflammatory_score: fsSelected.inflammatory_score||0,
+  });
+  rbAddingIngredient = false;
+  closeFoodDetail();
+  renderRecipeBuilder();
+}
+
+function removeRecipeIngredient(idx) {
+  recipeState.ingredients.splice(idx, 1);
+  renderRecipeBuilder();
+}
+
+function renderRecipeBuilder() {
+  const s = recipeState;
+  const tot = s.ingredients.reduce((a,i)=>({cal:a.cal+(i.cal||0),protein:a.protein+(i.protein||0),carbs:a.carbs+(i.carbs||0),fat:a.fat+(i.fat||0)}),{cal:0,protein:0,carbs:0,fat:0});
+  const sv = Math.max(1, s.servings);
+  const ps = {cal:Math.round(tot.cal/sv), protein:Math.round(tot.protein/sv*10)/10, carbs:Math.round(tot.carbs/sv*10)/10, fat:Math.round(tot.fat/sv*10)/10};
+  const hasInflam = s.ingredients.some(i=>(i.inflammatory_score||0)>0);
+
+  let html = '';
+
+  // Step 1
+  html += `<div class="recipe-step">
+    <div class="recipe-step-hdr">STEP 1 — NAME</div>
+    <input class="search-input" id="rbName" placeholder="e.g. My Protein Bowl" value="${escHtml(s.name)}" oninput="recipeState.name=this.value">
+  </div>`;
+
+  // Step 2
+  html += `<div class="recipe-step">
+    <div class="recipe-step-hdr">STEP 2 — INGREDIENTS${hasInflam?' <span class="inflam-badge" style="font-size:9px">⚠ Inflam</span>':''}</div>`;
+  s.ingredients.forEach((ing,i) => {
+    html += `<div class="recipe-ing-item">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(ing.name)}</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--dim)">${ing.servings}${ing.unit} · ${Math.round(ing.cal||0)} cal</div>
+      </div>
+      <div class="recipe-ing-del" onclick="removeRecipeIngredient(${i})">×</div>
+    </div>`;
+  });
+  html += `<div class="food-result" onclick="openRecipeIngredientSearch()">
+    <div class="food-result-info"><div class="food-result-name" style="color:var(--amber)">+ Add Ingredient</div></div>
+  </div>`;
+  if (tot.cal > 0) {
+    html += `<div class="macro-preview" style="margin-top:8px">
+      <div class="mp-item"><div class="mp-val">${Math.round(tot.cal)}</div><div class="mp-lbl">Cal</div></div>
+      <div class="mp-item"><div class="mp-val">${Math.round(tot.protein)}g</div><div class="mp-lbl">Prot</div></div>
+      <div class="mp-item"><div class="mp-val">${Math.round(tot.carbs)}g</div><div class="mp-lbl">Carb</div></div>
+      <div class="mp-item"><div class="mp-val">${Math.round(tot.fat)}g</div><div class="mp-lbl">Fat</div></div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Step 3
+  html += `<div class="recipe-step">
+    <div class="recipe-step-hdr">STEP 3 — YIELD</div>
+    <div class="ex-field">
+      <label>HOW MANY SERVINGS DOES THIS MAKE?</label>
+      <input type="number" inputmode="numeric" min="1" class="auth-input" id="rbServings" value="${s.servings}"
+        oninput="recipeState.servings=parseInt(this.value)||1;renderRecipeBuilder()">
+    </div>
+    ${tot.cal>0?`<div style="font-size:12px;color:var(--dim);margin-top:6px">Per serving: ${ps.cal} cal · ${ps.protein}g P · ${ps.carbs}g C · ${ps.fat}g F</div>`:''}
+  </div>`;
+
+  // Step 4 / Log Now
+  if (s._saved && s._savedRecipe) {
+    const r = s._savedRecipe;
+    html += `<div class="recipe-step">
+      <div class="recipe-step-hdr">LOG IT NOW?</div>
+      <div class="ex-field" style="margin-bottom:8px">
+        <label>SERVINGS TO LOG</label>
+        <input type="number" min="0.5" step="0.5" class="auth-input" id="rbLogServings" value="${s._logServings||1}"
+          oninput="recipeState._logServings=parseFloat(this.value)||1">
+      </div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:10px">${r.cal_per_serving} cal · ${r.protein_per_serving}g P per serving</div>
+      <div style="display:flex;gap:8px">
+        <button class="save-btn" onclick="logRecipeNow()">LOG IT</button>
+        <button class="save-btn" style="background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="closeRecipeBuilder()">DONE</button>
+      </div>
+    </div>`;
+  } else {
+    html += `<div class="recipe-step">
+      <div class="recipe-step-hdr">STEP 4 — SAVE</div>
+      <button class="save-btn" onclick="saveAndLogRecipe()">SAVE RECIPE</button>
+    </div>`;
+  }
+
+  document.getElementById('rbContent').innerHTML = html;
+}
+
+async function saveAndLogRecipe() {
+  const s = recipeState;
+  if (!s.name.trim()) { showToast('ADD A RECIPE NAME'); return; }
+  if (!s.ingredients.length) { showToast('ADD INGREDIENTS'); return; }
+  const sv = Math.max(1, s.servings);
+  const tot = s.ingredients.reduce((a,i)=>({cal:a.cal+(i.cal||0),protein:a.protein+(i.protein||0),carbs:a.carbs+(i.carbs||0),fat:a.fat+(i.fat||0)}),{cal:0,protein:0,carbs:0,fat:0});
+  const maxInflam = Math.max(0, ...s.ingredients.map(i=>i.inflammatory_score||0));
+  const recipe = {
+    user_id: USER_ID,
+    name: s.name.trim(),
+    ingredients: s.ingredients,
+    servings: sv,
+    cal_per_serving:     Math.round(tot.cal/sv),
+    protein_per_serving: Math.round(tot.protein/sv*10)/10,
+    carbs_per_serving:   Math.round(tot.carbs/sv*10)/10,
+    fat_per_serving:     Math.round(tot.fat/sv*10)/10,
+    inflammatory_score:  maxInflam,
+    created_at:          new Date().toISOString(),
+  };
+  const saved = await supaInsert('recipes', recipe);
+  recipeState._saved = true;
+  recipeState._savedRecipe = {...recipe, id: saved?.id};
+  recipeState._logServings = 1;
+  showToast('RECIPE SAVED ✓');
+  renderRecipeBuilder();
+}
+
+function logRecipeNow() {
+  const r = recipeState._savedRecipe;
+  if (!r) return;
+  const sv = recipeState._logServings || 1;
+  if (!currentEntry.food.meals || typeof currentEntry.food.meals !== 'object') currentEntry.food.meals = {};
+  if (!Array.isArray(currentEntry.food.meals.entries)) currentEntry.food.meals.entries = [];
+  currentEntry.food.meals.entries.push({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    food_id: r.id||null, name: r.name,
+    meal_slot: fsSlot || 'lunch',
+    unit: 'serving', servings: sv,
+    cal:     Math.round(r.cal_per_serving     * sv),
+    protein: Math.round(r.protein_per_serving * sv * 10) / 10,
+    carbs:   Math.round(r.carbs_per_serving   * sv * 10) / 10,
+    fat:     Math.round(r.fat_per_serving     * sv * 10) / 10,
+    inflammatory_score: r.inflammatory_score||0,
+    is_recipe: true,
+  });
+  saveFood(true);
+  closeRecipeBuilder();
+  renderFood();
+  renderDash();
+  showToast('RECIPE LOGGED ✓');
 }
 
 async function saveMeds(silent = false) {
@@ -2525,6 +3125,14 @@ function switchSection(name, el) {
   document.querySelectorAll('.stab').forEach(t=>t.className='stab');
   el.className='stab active';
   currentSection = name;
+}
+
+function goToFoodLog() {
+  const todayNav = document.querySelectorAll('.nav-btn')[1];
+  switchPage('today', todayNav);
+  const foodTab = document.querySelector('.stab[onclick*="food"]');
+  if (foodTab) switchSection('food', foodTab);
+  openFoodSearch(null);
 }
 
 // ═══════════════════════════════════════════════════════
