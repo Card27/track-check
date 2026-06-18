@@ -2594,10 +2594,11 @@ function closeFoodSearch() {
 }
 
 async function doFoodSearch(term) {
-  if (!term || term.length < 2) { document.getElementById('fsResults').innerHTML = ''; return; }
+  const q = (term || '').trim();
+  if (!q || q.length < 2) { document.getElementById('fsResults').innerHTML = ''; return; }
   document.getElementById('fsResults').innerHTML = '<div class="empty-state">Searching...</div>';
   const [prev, cached, live] = await Promise.all([
-    fetchPrevFoods(term), fetchCachedFoods(term), fetchLiveFoods(term)
+    fetchPrevFoods(q), fetchCachedFoods(q), fetchLiveFoods(q)
   ]);
   const seen = new Set();
   const dedup = arr => arr.filter(f => { const k = f.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
@@ -2748,7 +2749,7 @@ async function fetchPrevFoods(term) {
 
 async function fetchCachedFoods(term) {
   try {
-    const rows = await supaFetch('foods', `name=ilike.*${encodeURIComponent(term)}*&limit=10`);
+    const rows = await supaFetch('foods', `name=ilike.*${term.trim()}*&limit=10`);
     return rows.map(f => ({...f, _source:'DB'}));
   } catch(e) { return []; }
 }
@@ -2807,8 +2808,8 @@ async function cacheFoodToSupabase(food) {
 
 function openFoodDetail(food, slot) {
   fsSelected = food;
-  fsUnit = 'g';
-  fsServings = 100;
+  fsUnit = 'serving';
+  fsServings = 1;
   fsDetailSlot = slot || fsSlot || 'breakfast';
 
   document.getElementById('fdFoodName').textContent = food.name;
