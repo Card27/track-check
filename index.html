@@ -382,7 +382,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* TOAST */
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#080810;padding:9px 20px;border-radius:7px;font-family:var(--font-display);font-size:15px;letter-spacing:2px;opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast.error{background:var(--red);color:var(--text)}
+.err-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px}
+.err-card{background:var(--s2);border:1px solid var(--red);border-radius:10px;padding:22px 20px;max-width:320px;width:100%}
+.err-title{font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--red);margin-bottom:12px}
+.err-body{font-size:13px;color:var(--text);white-space:normal;word-break:break-word;line-height:1.5;margin-bottom:18px}
+.err-dismiss{width:100%;background:var(--red);color:var(--text);border:none;padding:11px;border-radius:7px;font-family:var(--font-display);font-size:15px;letter-spacing:2px;cursor:pointer}
 
 /* MISC */
 .divider{height:1px;background:var(--border);margin:10px 0}
@@ -1164,11 +1168,11 @@ async function supaFetch(table, params = '') {
 async function supaUpsert(table, data) {
   const { user_id, log_date } = data;
   if (!user_id || !log_date) {
-    showToast(`Save failed ${table}: missing user_id or log_date`, 'error');
+    showErrorModal(`Save failed ${table}: missing user_id or log_date`);
     return { ok: false, err: 'missing user_id or log_date' };
   }
   try {
-    // PATCH first — updates the row if it exists, returns representation to detect hit
+    // PATCH first — returns representation so we can confirm a row was hit
     const patchR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
       method: 'PATCH',
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
@@ -1177,26 +1181,38 @@ async function supaUpsert(table, data) {
     if (!patchR.ok) {
       const err = await patchR.json().catch(() => ({ message: patchR.statusText }));
       const detail = err.message || err.details || err.code || patchR.statusText;
-      showToast(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`, 'error');
+      showErrorModal(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`);
       return { ok: false, err: detail };
     }
     const patched = await patchR.json().catch(() => []);
     if (patched.length > 0) return { ok: true };
-    // No existing row — INSERT
+    // No existing row matched — INSERT
     const postR = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Prefer': 'return=minimal' },
       body: JSON.stringify(data)
     });
     if (!postR.ok) {
+      if (postR.status === 409) {
+        // Row appeared between our PATCH check and POST — retry PATCH once
+        const retryR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
+          method: 'PATCH',
+          headers: { ...getHeaders(), 'Prefer': 'return=representation' },
+          body: JSON.stringify(data)
+        });
+        if (retryR.ok) {
+          const retried = await retryR.json().catch(() => []);
+          if (retried.length > 0) return { ok: true };
+        }
+      }
       const err = await postR.json().catch(() => ({ message: postR.statusText }));
       const detail = err.message || err.details || err.code || postR.statusText;
-      showToast(`Save failed ${table}: HTTP ${postR.status} — ${detail}`, 'error');
+      showErrorModal(`Save failed ${table}: HTTP ${postR.status} — ${detail}`);
       return { ok: false, err: detail };
     }
     return { ok: true };
   } catch(e) {
-    showToast(`Save failed ${table}: ${e.message}`, 'error');
+    showErrorModal(`Save failed ${table}: ${e.message}`);
     return { ok: false, err: e.message };
   }
 }
@@ -3219,11 +3235,20 @@ async function saveSettings() {
   }
 }
 
-function showToast(msg='SAVED ✓', type='') {
+function showToast(msg='SAVED ✓') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast show' + (type === 'error' ? ' error' : '');
-  setTimeout(()=>t.className='toast', type === 'error' ? 5000 : 2000);
+  t.className = 'toast show';
+  setTimeout(()=>t.className='toast', 2000);
+}
+
+function showErrorModal(msg) {
+  const overlay = document.createElement('div');
+  overlay.className = 'err-overlay';
+  overlay.innerHTML = '<div class="err-card"><div class="err-title">SAVE ERROR</div><div class="err-body"></div><button class="err-dismiss">DISMISS</button></div>';
+  overlay.querySelector('.err-body').textContent = msg;
+  overlay.querySelector('.err-dismiss').onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
 }
 
 // ═══════════════════════════════════════════════════════
