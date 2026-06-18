@@ -383,6 +383,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* TOAST */
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#080810;padding:9px 20px;border-radius:7px;font-family:var(--font-display);font-size:15px;letter-spacing:2px;opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.overlay-centered{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-card{background:var(--s2);border:1px solid var(--border2);border-radius:12px;padding:20px;width:100%;max-width:320px}
+.modal-title{font-family:var(--font-display);font-size:17px;letter-spacing:1px;line-height:1.3;margin-bottom:2px;word-break:break-word}
+.modal-sub{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin:6px 0 14px}
+.modal-actions{display:flex;gap:8px;margin-top:14px}
 .menu-overlay{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
 .menu-overlay.open{transform:translateX(0)}
 .menu-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--s1)}
@@ -1026,6 +1031,44 @@ select:focus{outline:none;border-color:var(--amber)}
   </div>
 </div>
 
+<!-- INGREDIENT AMOUNT MODAL -->
+<div id="rbIngredientModal" class="overlay-centered">
+  <div class="modal-card">
+    <div class="modal-title" id="rbIngFoodName">Food</div>
+    <div class="modal-sub">Adding to recipe</div>
+    <div class="ex-field" style="margin-bottom:10px">
+      <label>AMOUNT</label>
+      <input type="number" inputmode="decimal" step="any" id="rbIngAmount" class="auth-input" value="100">
+    </div>
+    <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">UNIT</div>
+    <div class="unit-row" id="rbIngUnits"></div>
+    <div class="modal-actions">
+      <button class="save-btn" style="flex:1" onclick="confirmIngredientAmount()">ADD TO RECIPE</button>
+      <button class="save-btn" style="flex:0 0 auto;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="closeIngredientAmountModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECIPE LOG PROMPT -->
+<div id="rbLogPrompt" class="overlay-centered">
+  <div class="modal-card">
+    <div class="modal-title" id="rbLogRecipeName">Recipe</div>
+    <div class="modal-sub" id="rbLogMacros">0 cal per serving</div>
+    <div class="ex-field" style="margin-bottom:4px">
+      <label>HOW MANY SERVINGS?</label>
+      <input type="number" inputmode="decimal" step="0.5" min="0.5" id="rbLogServingsInput" class="auth-input" value="1">
+    </div>
+    <div id="rbLogSlotWrap" style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">MEAL</div>
+      <div class="slot-row" id="rbLogSlots"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="save-btn" style="flex:1" onclick="confirmRecipeLog()">LOG IT</button>
+      <button class="save-btn" style="flex:0 0 auto;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="closeRecipeLogPrompt()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">SAVED ✓</div>
 
 <script>
@@ -1192,6 +1235,8 @@ let fsServingGrams = 100;
 let fsServingEstimated = true;
 let fsDetailSlot = 'breakfast';
 let rbAddingIngredient = false;
+let rbIngFood = null, rbIngUnit = 'g';
+let rbLogRecipe = null, rbLogSlot = 'lunch';
 let recipeState = {name:'', ingredients:[], servings:1, step:1, _saved:false, _savedRecipe:null, _logServings:1};
 const UNIT_WEIGHTS = {g:1, oz:28.35, cup:240, tbsp:15, tsp:5, ml:1, piece:100, slice:30, serving:100};
 const TARGET_CAL = 1600, TARGET_PRO = 190, TARGET_CARB = 150, TARGET_FAT = 60;
@@ -2658,12 +2703,12 @@ async function doFoodSearch(term) {
   const q = (term || '').trim();
   if (!q || q.length < 2) { document.getElementById('fsResults').innerHTML = ''; return; }
   document.getElementById('fsResults').innerHTML = '<div class="empty-state">Searching...</div>';
-  const [prev, cached, live] = await Promise.all([
-    fetchPrevFoods(q), fetchCachedFoods(q), fetchLiveFoods(q)
+  const [recipes, prev, cached, live] = await Promise.all([
+    fetchUserRecipes(q), fetchPrevFoods(q), fetchCachedFoods(q), fetchLiveFoods(q)
   ]);
   const seen = new Set();
   const dedup = arr => arr.filter(f => { const k = f.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
-  window._fsResults = [...dedup(prev), ...dedup(cached), ...dedup(live)];
+  window._fsResults = [...dedup(recipes), ...dedup(prev), ...dedup(cached), ...dedup(live)];
   renderSearchResults(window._fsResults, term);
 }
 
@@ -2681,12 +2726,17 @@ function renderSearchResults(results) {
       const fl = flagFood(f);
       const nameStyle = fl.isGeneral ? 'color:var(--red)' : '';
       const fire = fl.isPersonal ? ' 🔥' : '';
-      html += `<div class="food-result" onclick="selectSearchResult(${i})">
+      const isRecipe = f._source === 'RECIPE';
+      const calLabel = isRecipe ? 'cal/serving' : 'cal/100g';
+      const srcHtml = isRecipe
+        ? `<div class="food-result-src" style="color:var(--purple)">MY RECIPE</div>`
+        : `<div class="food-result-src">${f._source||''}</div>`;
+      html += `<div class="food-result" onclick="selectSearchResult(${i})" ${isRecipe?'style="border-color:rgba(136,102,221,.35)"':''}>
         <div class="food-result-info">
           <div class="food-result-name" style="${nameStyle}">${escHtml(f.name)}${fire}</div>
-          <div class="food-result-cal">${Math.round(f.cal_per_100g||0)} cal/100g · P ${Math.round(f.protein_per_100g||0)}g · C ${Math.round(f.carbs_per_100g||0)}g · F ${Math.round(f.fat_per_100g||0)}g</div>
+          <div class="food-result-cal">${Math.round(f.cal_per_100g||0)} ${calLabel} · P ${Math.round(f.protein_per_100g||0)}g · C ${Math.round(f.carbs_per_100g||0)}g · F ${Math.round(f.fat_per_100g||0)}g</div>
         </div>
-        <div class="food-result-src">${f._source||''}</div>
+        ${srcHtml}
       </div>`;
     });
   }
@@ -2696,7 +2746,9 @@ function renderSearchResults(results) {
 function selectSearchResult(idx) {
   const food = (window._fsResults || [])[idx];
   if (!food) return;
+  if (food._source === 'RECIPE') { openRecipeLogPrompt(food); return; }
   if (food._source === 'USDA' || food._source === 'OFF') cacheFoodToSupabase(food);
+  if (rbAddingIngredient) { openIngredientAmountModal(food); return; }
   openFoodDetail(food, fsSlot);
 }
 
@@ -3053,7 +3105,7 @@ function tapLoggedItem(idx) {
 // ═══════════════════════════════════════════════════════
 
 function openRecipeBuilder() {
-  recipeState = {name:'', ingredients:[], servings:1, _saved:false, _savedRecipe:null, _logServings:1};
+  recipeState = {name:'', description:'', ingredients:[], servings:1, _saved:false, _savedRecipe:null, _logServings:1};
   closeFoodSearch();
   document.getElementById('recipeBuilderSheet').classList.add('open');
   renderRecipeBuilder();
@@ -3062,6 +3114,135 @@ function openRecipeBuilder() {
 function closeRecipeBuilder() {
   rbAddingIngredient = false;
   document.getElementById('recipeBuilderSheet').classList.remove('open');
+}
+
+// ── Ingredient amount modal ──────────────────────────────
+
+function openIngredientAmountModal(food) {
+  rbIngFood = food;
+  rbIngUnit = 'g';
+  document.getElementById('rbIngFoodName').textContent = food.name;
+  document.getElementById('rbIngAmount').value = 100;
+  renderIngredientUnits();
+  closeFoodSearch();
+  document.getElementById('rbIngredientModal').style.display = 'flex';
+}
+
+function closeIngredientAmountModal() {
+  rbIngFood = null;
+  rbAddingIngredient = false;
+  document.getElementById('rbIngredientModal').style.display = 'none';
+  document.getElementById('recipeBuilderSheet').classList.add('open');
+}
+
+function renderIngredientUnits() {
+  document.getElementById('rbIngUnits').innerHTML =
+    ['g','oz','cup','tbsp','tsp','ml'].map(u =>
+      `<div class="unit-chip${rbIngUnit===u?' sel':''}" onclick="rbIngUnit='${u}';renderIngredientUnits()">${u}</div>`
+    ).join('');
+}
+
+function confirmIngredientAmount() {
+  if (!rbIngFood) return;
+  const amount = parseFloat(document.getElementById('rbIngAmount').value) || 0;
+  if (amount <= 0) return;
+  const m = calcMacrosForEntry(rbIngFood, rbIngUnit, amount);
+  recipeState.ingredients.push({
+    food_id: rbIngFood.id || null,
+    name: rbIngFood.name,
+    amount, unit: rbIngUnit,
+    macros: {cal:m.cal, protein:m.protein, carbs:m.carbs, fat:m.fat},
+    cal: m.cal, protein: m.protein, carbs: m.carbs, fat: m.fat,
+    inflammatory_score: rbIngFood.inflammatory_score || 0,
+  });
+  document.getElementById('rbIngredientModal').style.display = 'none';
+  rbIngFood = null;
+  rbAddingIngredient = false;
+  document.getElementById('recipeBuilderSheet').classList.add('open');
+  renderRecipeBuilder();
+}
+
+// ── Recipe log prompt ────────────────────────────────────
+
+function openRecipeLogPrompt(recipe) {
+  rbLogRecipe = recipe;
+  rbLogSlot = fsSlot || 'lunch';
+  const ps = recipe.per_serving_macros || {
+    cal: recipe.cal_per_100g || 0,
+    protein: recipe.protein_per_100g || 0,
+    carbs: recipe.carbs_per_100g || 0,
+    fat: recipe.fat_per_100g || 0,
+  };
+  document.getElementById('rbLogRecipeName').textContent = recipe.name;
+  document.getElementById('rbLogMacros').textContent =
+    `${Math.round(ps.cal)} cal · ${ps.protein}g P · ${ps.carbs}g C · ${ps.fat}g F per serving`;
+  document.getElementById('rbLogServingsInput').value = 1;
+  document.getElementById('rbLogSlots').innerHTML = MEAL_SLOTS.map(s =>
+    `<div class="slot-chip${rbLogSlot===s?' sel':''}" onclick="rbLogSlot='${s}';document.querySelectorAll('#rbLogSlots .slot-chip').forEach(c=>c.className='slot-chip');this.className='slot-chip sel'">${SLOT_LABELS[s]}</div>`
+  ).join('');
+  closeFoodSearch();
+  document.getElementById('rbLogPrompt').style.display = 'flex';
+}
+
+function closeRecipeLogPrompt() {
+  rbLogRecipe = null;
+  document.getElementById('rbLogPrompt').style.display = 'none';
+}
+
+function confirmRecipeLog() {
+  if (!rbLogRecipe) return;
+  const sv = parseFloat(document.getElementById('rbLogServingsInput').value) || 1;
+  const ps = rbLogRecipe.per_serving_macros || {
+    cal: rbLogRecipe.cal_per_100g || 0,
+    protein: rbLogRecipe.protein_per_100g || 0,
+    carbs: rbLogRecipe.carbs_per_100g || 0,
+    fat: rbLogRecipe.fat_per_100g || 0,
+  };
+  if (!currentEntry.food.meals || typeof currentEntry.food.meals !== 'object') currentEntry.food.meals = {};
+  if (!Array.isArray(currentEntry.food.meals.entries)) currentEntry.food.meals.entries = [];
+  currentEntry.food.meals.entries.push({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    food_id: rbLogRecipe.id || null,
+    name: rbLogRecipe.name,
+    meal_slot: rbLogSlot,
+    unit: 'serving', servings: sv,
+    cal:     Math.round((ps.cal     || 0) * sv),
+    protein: Math.round((ps.protein || 0) * sv * 10) / 10,
+    carbs:   Math.round((ps.carbs   || 0) * sv * 10) / 10,
+    fat:     Math.round((ps.fat     || 0) * sv * 10) / 10,
+    inflammatory_score: rbLogRecipe.inflammatory_score || 0,
+    is_recipe: true, serving_g: null,
+  });
+  saveFood(true);
+  closeRecipeLogPrompt();
+  renderFood();
+  renderDash();
+  showToast('RECIPE LOGGED ✓');
+}
+
+// ── fetchUserRecipes ─────────────────────────────────────
+
+async function fetchUserRecipes(term) {
+  if (!USER_ID) return [];
+  try {
+    const rows = await supaFetch('recipes', `user_id=eq.${USER_ID}&name=ilike.*${term}*&order=created_at.desc&limit=5`);
+    return rows.map(r => {
+      const ps = r.per_serving_macros || {
+        cal: r.cal_per_serving || 0, protein: r.protein_per_serving || 0,
+        carbs: r.carbs_per_serving || 0, fat: r.fat_per_serving || 0,
+      };
+      return {
+        id: r.id, name: r.name,
+        cal_per_100g: ps.cal, protein_per_100g: ps.protein,
+        carbs_per_100g: ps.carbs, fat_per_100g: ps.fat,
+        per_serving_macros: ps,
+        inflammatory_score: r.inflammatory_score || 0,
+        ingredients_text: (r.ingredients || []).map(i => i.name).join(' '),
+        servings_yield: r.servings_yield || r.servings || 1,
+        _source: 'RECIPE', _recipe: r,
+      };
+    });
+  } catch(e) { return []; }
 }
 
 function openRecipeIngredientSearch() {
@@ -3103,8 +3284,9 @@ function renderRecipeBuilder() {
 
   // Step 1
   html += `<div class="recipe-step">
-    <div class="recipe-step-hdr">STEP 1 — NAME</div>
-    <input class="search-input" id="rbName" placeholder="e.g. My Protein Bowl" value="${escHtml(s.name)}" oninput="recipeState.name=this.value">
+    <div class="recipe-step-hdr">STEP 1 — NAME &amp; DESCRIPTION</div>
+    <input class="search-input" id="rbName" placeholder="Recipe name (required)" value="${escHtml(s.name)}" oninput="recipeState.name=this.value" style="margin-bottom:8px">
+    <input class="search-input" id="rbDesc" placeholder="Description (optional)" value="${escHtml(s.description||'')}" oninput="recipeState.description=this.value">
   </div>`;
 
   // Step 2
@@ -3160,9 +3342,10 @@ function renderRecipeBuilder() {
       </div>
     </div>`;
   } else {
+    const canSave = s.name.trim() && s.ingredients.length > 0 && s.servings >= 1;
     html += `<div class="recipe-step">
       <div class="recipe-step-hdr">STEP 4 — SAVE</div>
-      <button class="save-btn" onclick="saveAndLogRecipe()">SAVE RECIPE</button>
+      <button class="save-btn" onclick="saveAndLogRecipe()" ${canSave ? '' : 'disabled style="opacity:.4;pointer-events:none"'}>SAVE RECIPE</button>
     </div>`;
   }
 
@@ -3173,24 +3356,37 @@ async function saveAndLogRecipe() {
   const s = recipeState;
   if (!s.name.trim()) { showToast('ADD A RECIPE NAME'); return; }
   if (!s.ingredients.length) { showToast('ADD INGREDIENTS'); return; }
+  if (s.servings < 1) { showToast('SET SERVINGS YIELD'); return; }
   const sv = Math.max(1, s.servings);
   const tot = s.ingredients.reduce((a,i)=>({cal:a.cal+(i.cal||0),protein:a.protein+(i.protein||0),carbs:a.carbs+(i.carbs||0),fat:a.fat+(i.fat||0)}),{cal:0,protein:0,carbs:0,fat:0});
+  const ps = {
+    cal:     Math.round(tot.cal/sv),
+    protein: Math.round(tot.protein/sv*10)/10,
+    carbs:   Math.round(tot.carbs/sv*10)/10,
+    fat:     Math.round(tot.fat/sv*10)/10,
+  };
   const maxInflam = Math.max(0, ...s.ingredients.map(i=>i.inflammatory_score||0));
   const recipe = {
     user_id: USER_ID,
     name: s.name.trim(),
-    ingredients: s.ingredients,
+    description: (s.description||'').trim() || null,
+    servings_yield: sv,
     servings: sv,
-    cal_per_serving:     Math.round(tot.cal/sv),
-    protein_per_serving: Math.round(tot.protein/sv*10)/10,
-    carbs_per_serving:   Math.round(tot.carbs/sv*10)/10,
-    fat_per_serving:     Math.round(tot.fat/sv*10)/10,
+    ingredients: s.ingredients,
+    total_macros: {cal:Math.round(tot.cal), protein:Math.round(tot.protein*10)/10, carbs:Math.round(tot.carbs*10)/10, fat:Math.round(tot.fat*10)/10},
+    per_serving_macros: ps,
+    cal_per_serving:     ps.cal,
+    protein_per_serving: ps.protein,
+    carbs_per_serving:   ps.carbs,
+    fat_per_serving:     ps.fat,
     inflammatory_score:  maxInflam,
     created_at:          new Date().toISOString(),
+    updated_at:          new Date().toISOString(),
   };
   const saved = await supaInsert('recipes', recipe);
+  if (!saved) return;
   recipeState._saved = true;
-  recipeState._savedRecipe = {...recipe, id: saved?.id};
+  recipeState._savedRecipe = {...recipe, id: saved.id};
   recipeState._logServings = 1;
   showToast('RECIPE SAVED ✓');
   renderRecipeBuilder();
