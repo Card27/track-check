@@ -968,6 +968,13 @@ select:focus{outline:none;border-color:var(--amber)}
         <input type="number" inputmode="decimal" step="any" id="fdServings" class="auth-input" placeholder="100"
           oninput="updateDetailServings(this.value)">
       </div>
+      <div id="fdServingSizeWrap" style="display:none;margin-bottom:12px">
+        <div class="ex-field">
+          <label id="fdServingSizeLbl">SERVING SIZE (g)</label>
+          <input type="number" inputmode="decimal" step="1" id="fdServingSizeG" class="auth-input" placeholder="100"
+            oninput="updateServingSizeG(this.value)">
+        </div>
+      </div>
       <div id="fdSlotsWrap">
         <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">MEAL</div>
         <div class="slot-row" id="fdSlots"></div>
@@ -1157,6 +1164,8 @@ let fsSlot = null;
 let fsSelected = null;
 let fsUnit = 'g';
 let fsServings = 100;
+let fsServingGrams = 100;
+let fsServingEstimated = true;
 let fsDetailSlot = 'breakfast';
 let rbAddingIngredient = false;
 let recipeState = {name:'', ingredients:[], servings:1, step:1, _saved:false, _savedRecipe:null, _logServings:1};
@@ -2565,7 +2574,8 @@ function scoreFoodInflammation(name) {
 }
 
 function calcMacrosForEntry(food, unit, servings) {
-  const weightG = (UNIT_WEIGHTS[unit] || 1) * servings;
+  const unitG = (unit === 'serving' && food?.serving_g) ? food.serving_g : (UNIT_WEIGHTS[unit] || 1);
+  const weightG = unitG * servings;
   const f = weightG / 100;
   return {
     cal:     Math.round((food.cal_per_100g     || 0) * f),
@@ -2730,7 +2740,8 @@ async function fetchPrevFoods(term) {
       (row.meals?.entries || []).forEach(e => {
         if (seen.has(e.name) || !e.name.toLowerCase().includes(term.toLowerCase())) return;
         seen.add(e.name);
-        const wG = (UNIT_WEIGHTS[e.unit]||1) * e.servings;
+        const unitG = (e.unit === 'serving' && e.serving_g) ? e.serving_g : (UNIT_WEIGHTS[e.unit]||1);
+        const wG = unitG * e.servings;
         const fac = wG > 0 ? 100 / wG : 0;
         foods.push({
           id: e.food_id, name: e.name,
@@ -2739,6 +2750,7 @@ async function fetchPrevFoods(term) {
           carbs_per_100g:   Math.round((e.carbs   ||0)*fac*10)/10,
           fat_per_100g:     Math.round((e.fat     ||0)*fac*10)/10,
           inflammatory_score: e.inflammatory_score||0,
+          serving_g: e.serving_g || null,
           _source: 'RECENT',
         });
       });
@@ -2765,9 +2777,18 @@ async function fetchLiveFoods(term) {
       uR.value.foods.slice(0,5).forEach(f => {
         const gn = id => f.foodNutrients?.find(n=>n.nutrientId===id)?.value||0;
         const {score,flags} = scoreFoodInflammation(f.description);
+        let uSG = null, uSEst = true;
+        if (f.servingSize && f.servingSizeUnit) {
+          const su = f.servingSizeUnit.toLowerCase();
+          if (su==='g'||su==='grams') { uSG = Math.round(f.servingSize); uSEst = false; }
+          else if (su==='oz'||su==='ounces') { uSG = Math.round(f.servingSize*28.35); uSEst = false; }
+          else if (su==='ml') { uSG = Math.round(f.servingSize); uSEst = false; }
+        }
+        if (!uSG && f.foodMeasures?.length) { uSG = Math.round(f.foodMeasures[0].gramWeight||0)||null; uSEst = !uSG; }
         results.push({external_id:'usda_'+f.fdcId, name:f.description,
           cal_per_100g:gn(1008), protein_per_100g:gn(1003), carbs_per_100g:gn(1005), fat_per_100g:gn(1004),
-          inflammatory_score:score, inflammatory_flags:flags, _source:'USDA'});
+          inflammatory_score:score, inflammatory_flags:flags, _source:'USDA',
+          serving_g: uSG||null, serving_estimated: uSG ? uSEst : true});
       });
     }
     if (oR.status==='fulfilled' && oR.value?.products) {
@@ -2775,10 +2796,18 @@ async function fetchLiveFoods(term) {
         if (!p.product_name) return;
         const n = p.nutriments||{};
         const {score,flags} = scoreFoodInflammation(p.product_name);
+        let oSG = null, oSEst = true;
+        const oSQ = parseFloat(p.serving_quantity);
+        if (oSQ > 0) { oSG = Math.round(oSQ); oSEst = false; }
+        else if (p.serving_size) {
+          const sm = String(p.serving_size).match(/(\d+(?:\.\d+)?)\s*(g|oz|ml)?/i);
+          if (sm) { let sv = parseFloat(sm[1]); if ((sm[2]||'g').toLowerCase()==='oz') sv*=28.35; oSG=Math.round(sv); oSEst=false; }
+        }
         results.push({external_id:'off_'+p.id, name:p.product_name,
           cal_per_100g:n['energy-kcal_100g']||0, protein_per_100g:n['proteins_100g']||0,
           carbs_per_100g:n['carbohydrates_100g']||0, fat_per_100g:n['fat_100g']||0,
-          inflammatory_score:score, inflammatory_flags:flags, _source:'OFF'});
+          inflammatory_score:score, inflammatory_flags:flags, _source:'OFF',
+          serving_g: oSG||null, serving_estimated: oSG ? oSEst : true});
       });
     }
     return results;
@@ -2797,6 +2826,7 @@ async function cacheFoodToSupabase(food) {
         carbs_per_100g:food.carbs_per_100g, fat_per_100g:food.fat_per_100g,
         inflammatory_score:food.inflammatory_score||0,
         inflammatory_flags:food.inflammatory_flags||[],
+        serving_g: food.serving_g || null,
       })
     });
   } catch(e) {}
@@ -2810,6 +2840,9 @@ function openFoodDetail(food, slot) {
   fsSelected = food;
   fsUnit = 'serving';
   fsServings = 1;
+  fsServingGrams = food.serving_g || 100;
+  fsServingEstimated = !food.serving_g;
+  food.serving_g = fsServingGrams;
   fsDetailSlot = slot || fsSlot || 'breakfast';
 
   document.getElementById('fdFoodName').textContent = food.name;
@@ -2819,6 +2852,7 @@ function openFoodDetail(food, slot) {
   document.getElementById('fdLogBtn').textContent = rbAddingIngredient ? 'ADD TO RECIPE' : 'LOG IT';
   renderDetailUnits();
   renderDetailSlots();
+  renderServingSizeRow();
   renderDetailMacros();
   closeFoodSearch();
   document.getElementById('foodDetailSheet').classList.add('open');
@@ -2852,9 +2886,30 @@ function renderDetailMacros() {
   document.getElementById('fdFatVal').textContent  = m.fat + 'g';
 }
 
-function setDetailUnit(u) { fsUnit = u; renderDetailUnits(); renderDetailMacros(); }
+function setDetailUnit(u) { fsUnit = u; renderDetailUnits(); renderServingSizeRow(); renderDetailMacros(); }
 function setDetailSlot(s) { fsDetailSlot = s; renderDetailSlots(); }
 function updateDetailServings(val) { fsServings = parseFloat(val) || 0; renderDetailMacros(); }
+
+function renderServingSizeRow() {
+  const wrap = document.getElementById('fdServingSizeWrap');
+  if (!wrap) return;
+  if (fsUnit !== 'serving') { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  document.getElementById('fdServingSizeLbl').textContent =
+    fsServingEstimated ? 'SERVING SIZE (g) — estimated' : 'SERVING SIZE (g)';
+  document.getElementById('fdServingSizeG').value = fsServingGrams;
+  if (fsSelected) fsSelected.serving_g = fsServingGrams;
+}
+
+function updateServingSizeG(val) {
+  const v = parseFloat(val);
+  if (v > 0) {
+    fsServingGrams = v;
+    fsServingEstimated = false;
+    if (fsSelected) fsSelected.serving_g = v;
+    renderDetailMacros();
+  }
+}
 
 function handleLogOrAddIngredient() {
   if (rbAddingIngredient) addRecipeIngredient();
@@ -2875,7 +2930,15 @@ async function logFood() {
     servings: fsServings,
     cal: m.cal, protein: m.protein, carbs: m.carbs, fat: m.fat,
     inflammatory_score: fsSelected.inflammatory_score || 0,
+    serving_g: fsUnit === 'serving' ? fsServingGrams : null,
   });
+  if (fsUnit === 'serving' && fsSelected.external_id) {
+    fetch(`${SUPA_URL}/rest/v1/foods?external_id=eq.${encodeURIComponent(fsSelected.external_id)}`, {
+      method: 'PATCH',
+      headers: {...getHeaders(), 'Prefer': 'return=minimal'},
+      body: JSON.stringify({serving_g: fsServingGrams})
+    }).catch(() => {});
+  }
   closeFoodDetail();
   await saveFood(true);
   renderFood();
@@ -2897,7 +2960,8 @@ function tapLoggedItem(idx) {
   if (!Array.isArray(entries)) return;
   const item = entries[idx];
   if (!item) return;
-  const wG = (UNIT_WEIGHTS[item.unit]||1) * item.servings;
+  const unitG = (item.unit === 'serving' && item.serving_g) ? item.serving_g : (UNIT_WEIGHTS[item.unit]||1);
+  const wG = unitG * item.servings;
   const fac = wG > 0 ? 100 / wG : 0;
   const food = {
     id: item.food_id, name: item.name,
@@ -2906,6 +2970,7 @@ function tapLoggedItem(idx) {
     carbs_per_100g:   Math.round((item.carbs   ||0)*fac*10)/10,
     fat_per_100g:     Math.round((item.fat     ||0)*fac*10)/10,
     inflammatory_score: item.inflammatory_score||0,
+    serving_g: item.serving_g || null,
   };
   entries.splice(idx, 1);
   saveFood(true);
