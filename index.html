@@ -346,7 +346,7 @@ select:focus{outline:none;border-color:var(--amber)}
 
       <div class="kpi-row" id="kpiRow">
         <div class="kpi"><div class="kpi-val" id="kpi-streak">0</div><div class="kpi-lbl">Day Streak</div></div>
-        <div class="kpi"><div class="kpi-val" id="kpi-lost">0</div><div class="kpi-lbl">lbs Lost</div></div>
+        <div class="kpi"><div class="kpi-val" id="kpi-weight">—</div><div class="kpi-lbl">WEIGHT</div><div id="kpi-weight-date" style="font-size:9px;color:var(--dim);margin-top:2px"></div></div>
         <div class="kpi"><div class="kpi-val" id="kpi-sessions">0</div><div class="kpi-lbl">Sessions</div></div>
       </div>
 
@@ -500,6 +500,18 @@ select:focus{outline:none;border-color:var(--amber)}
               <div id="autoTriggers"></div>
             </div>
             <textarea class="notes-area" id="flareNotes" placeholder="Any observations — joint locations, severity, what helps..."></textarea>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-icon">⚖️</div>
+            <div class="card-title">BODY WEIGHT</div>
+          </div>
+          <div class="card-body">
+            <div class="ex-field">
+              <label>TODAY'S WEIGHT (LBS)</label>
+              <input type="number" inputmode="decimal" step="0.1" id="weightInput" placeholder="e.g. 185.5" onchange="updateWeight(this.value)">
+            </div>
           </div>
         </div>
         <button class="save-btn" onclick="saveSection('flare')">SAVE FLARE LOG</button>
@@ -857,7 +869,10 @@ function mergeDay(dateStr, w, feelings, f, s, wt, fl) {
   if (f) entry.food = { meals: f.meals||{}, cheats: f.cheats||{} };
   if (s) entry.meds = s.supplements||{};
   if (wt) entry.water = { total: Number(wt.total_oz)||0, log: wt.entries||[] };
-  if (fl) entry.flare = { status: fl.status||'good', triggers: fl.triggers||[], notes: fl.notes||'' };
+  if (fl) {
+    entry.flare = { status: fl.status||'good', triggers: fl.triggers||[], notes: fl.notes||'' };
+    if (fl.weight_lbs != null) entry.weight = fl.weight_lbs;
+  }
   return entry;
 }
 
@@ -892,7 +907,7 @@ async function stLoadAll() {
     foods.forEach(r => { ensure(r.log_date); out[r.log_date].food = { meals: r.meals||{}, cheats: r.cheats||{} }; });
     supps.forEach(r => { ensure(r.log_date); out[r.log_date].meds = r.supplements||{}; });
     waters.forEach(r => { ensure(r.log_date); out[r.log_date].water = { total: Number(r.total_oz)||0, log: r.entries||[] }; });
-    flares.forEach(r => { ensure(r.log_date); out[r.log_date].flare = { status: r.status||'good', triggers: r.triggers||[], notes: r.notes||'' }; });
+    flares.forEach(r => { ensure(r.log_date); out[r.log_date].flare = { status: r.status||'good', triggers: r.triggers||[], notes: r.notes||'' }; if (r.weight_lbs != null) out[r.log_date].weight = r.weight_lbs; });
     return out;
   } catch(e) { return {}; }
 }
@@ -1033,10 +1048,19 @@ function renderDash() {
   document.getElementById('kpi-streak').textContent = streak;
   document.getElementById('kpi-sessions').textContent = entries.filter(e => e.workout?.cardio && Object.values(e.workout.cardio).some(v => v && (typeof v==='boolean'?v:v.done))).length;
 
-  const weights = entries.filter(e=>e.weight).map(e=>e.weight);
-  const startW = weights.length ? Math.max(...weights) : 0;
-  const curW = weights.length ? weights[weights.length-1] : 0;
-  document.getElementById('kpi-lost').textContent = Math.max(0, startW - curW).toFixed(1);
+  const todayW = currentEntry.weight ?? allHistory[todayStr]?.weight ?? null;
+  const weightDates = Object.keys(allHistory).sort().filter(d => allHistory[d].weight != null);
+  let weightVal = '—', weightDateStr = '';
+  if (todayW != null) {
+    weightVal = todayW.toFixed(1);
+  } else if (weightDates.length) {
+    const lastD = weightDates[weightDates.length - 1];
+    weightVal = allHistory[lastD].weight.toFixed(1);
+    const [,mm,dd] = lastD.split('-');
+    weightDateStr = `as of ${parseInt(mm)}/${parseInt(dd)}`;
+  }
+  document.getElementById('kpi-weight').textContent = weightVal;
+  document.getElementById('kpi-weight-date').textContent = weightDateStr;
 
   // Rings
   const calLogged = calcTodayCals();
@@ -1599,6 +1623,8 @@ function renderFlare() {
       </div>`).join('');
 
   document.getElementById('flareNotes').value = currentEntry.flare.notes || '';
+  const wInput = document.getElementById('weightInput');
+  if (wInput) wInput.value = currentEntry.weight != null ? currentEntry.weight : '';
 }
 
 function setFlare(val) {
@@ -1995,16 +2021,32 @@ async function saveWater(silent = false) {
   if (res?.ok) { ensureHistory(); allHistory[todayStr].water = currentEntry.water; }
 }
 
+function updateWeight(val) {
+  const parsed = parseFloat(val);
+  currentEntry.weight = isNaN(parsed) ? null : parsed;
+}
+
 async function saveFlare(silent = false) {
   currentEntry.flare.notes = document.getElementById('flareNotes')?.value || '';
+  const wInput = document.getElementById('weightInput');
+  if (wInput) {
+    const parsed = parseFloat(wInput.value);
+    currentEntry.weight = isNaN(parsed) ? null : parsed;
+  }
   const res = await supaUpsert('flare_logs', {
     user_id: USER_ID, log_date: todayStr,
     status: currentEntry.flare.status,
     triggers: currentEntry.flare.triggers,
     notes: currentEntry.flare.notes,
+    weight_lbs: currentEntry.weight,
     updated_at: new Date().toISOString()
   });
-  if (res?.ok) { ensureHistory(); allHistory[todayStr].flare = currentEntry.flare; if (!silent) showToast('FLARE SAVED ✓'); }
+  if (res?.ok) {
+    ensureHistory();
+    allHistory[todayStr].flare = currentEntry.flare;
+    allHistory[todayStr].weight = currentEntry.weight;
+    if (!silent) showToast('FLARE SAVED ✓');
+  }
   else if (!silent) showToast('SAVE FAILED');
 }
 
