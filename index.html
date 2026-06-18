@@ -1166,6 +1166,14 @@ async function supaFetch(table, params = '') {
 }
 
 async function supaUpsert(table, data) {
+  // Confirm session is valid before any write
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) {
+    showErrorModal('Save failed: no valid session. Please sign in again.');
+    return { ok: false, err: 'no valid session' };
+  }
+  if (USER_ID !== session.user.id) USER_ID = session.user.id;
+
   const { user_id, log_date } = data;
   if (!user_id || !log_date) {
     showErrorModal(`Save failed ${table}: missing user_id or log_date`);
@@ -1173,6 +1181,7 @@ async function supaUpsert(table, data) {
   }
   try {
     // PATCH first — returns representation so we can confirm a row was hit
+    console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: PATCH');
     const patchR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
       method: 'PATCH',
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
@@ -1187,6 +1196,7 @@ async function supaUpsert(table, data) {
     const patched = await patchR.json().catch(() => []);
     if (patched.length > 0) return { ok: true };
     // No existing row matched — INSERT
+    console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: POST');
     const postR = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Prefer': 'return=minimal' },
@@ -1195,6 +1205,7 @@ async function supaUpsert(table, data) {
     if (!postR.ok) {
       if (postR.status === 409) {
         // Row appeared between our PATCH check and POST — retry PATCH once
+        console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: PATCH retry (409)');
         const retryR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
           method: 'PATCH',
           headers: { ...getHeaders(), 'Prefer': 'return=representation' },
@@ -1218,7 +1229,16 @@ async function supaUpsert(table, data) {
 }
 
 async function supaInsert(table, data) {
+  // Confirm session is valid before any write
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) {
+    showErrorModal('Save failed: no valid session. Please sign in again.');
+    return null;
+  }
+  if (USER_ID !== session.user.id) USER_ID = session.user.id;
+
   try {
+    console.log('[supaInsert] user_id:', data.user_id, 'table:', table);
     const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
@@ -1226,12 +1246,15 @@ async function supaInsert(table, data) {
     });
     if (!r.ok) {
       const err = await r.json().catch(() => ({ message: r.statusText }));
-      console.error(`[supabase] ${table} insert failed ${r.status}:`, err);
+      showErrorModal(`Save failed ${table}: HTTP ${r.status} — ${err.message || err.details || err.code || r.statusText}`);
       return null;
     }
     const rows = await r.json();
     return rows[0] || null;
-  } catch(e) { console.error(`[supabase] ${table} insert error:`, e); return null; }
+  } catch(e) {
+    showErrorModal(`Save failed ${table}: ${e.message}`);
+    return null;
+  }
 }
 
 async function supaDelete(table, filter) {
