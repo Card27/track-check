@@ -785,16 +785,31 @@ async function supaFetch(table, params = '') {
 }
 
 async function supaUpsert(table, data) {
+  const { user_id, log_date } = data;
   try {
-    const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-      method: 'POST',
-      headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    // PATCH first — updates the row if it exists
+    const patchR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
+      method: 'PATCH',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=representation' },
       body: JSON.stringify(data)
     });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({ message: r.statusText }));
-      console.error(`[supabase] ${table} upsert failed ${r.status}:`, err);
-      return { ok: false, err: err.message || err.code || r.status };
+    if (!patchR.ok) {
+      const err = await patchR.json().catch(() => ({ message: patchR.statusText }));
+      console.error(`[supabase] ${table} PATCH failed ${patchR.status}:`, err);
+      return { ok: false, err: err.message || err.code || patchR.status };
+    }
+    const patched = await patchR.json().catch(() => []);
+    if (patched.length > 0) return { ok: true };
+    // No existing row — INSERT
+    const postR = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(data)
+    });
+    if (!postR.ok) {
+      const err = await postR.json().catch(() => ({ message: postR.statusText }));
+      console.error(`[supabase] ${table} POST failed ${postR.status}:`, err);
+      return { ok: false, err: err.message || err.code || postR.status };
     }
     return { ok: true };
   } catch(e) { console.error(`[supabase] ${table} upsert error:`, e); return { ok: false, err: e.message }; }
