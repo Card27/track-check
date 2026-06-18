@@ -1171,39 +1171,45 @@ async function supaUpsert(table, data) {
   const session = await getOrRefreshSession();
   if (!session?.user?.id) {
     showErrorModal('Save failed: no valid session. Please sign in again.', {
-      userId: USER_ID, sessionUid: undefined, table, method: 'none', status: 'no session'
+      userId: USER_ID, sessionUid: undefined, table, method: 'none', status: 'no session',
+      patch_response: 'n/a', patch_rows: 'n/a'
     });
     return { ok: false, err: 'no valid session' };
   }
-  if (USER_ID !== session.user.id) USER_ID = session.user.id;
+  // Sync currentSession if token was refreshed so getHeaders() uses the fresh Bearer token
+  if (session.access_token !== currentSession?.access_token) setSession(session);
 
   const { user_id, log_date } = data;
   console.log('[supaUpsert] user_id:', user_id, 'type:', typeof user_id);
   if (!user_id || !log_date) {
     showErrorModal(`Save failed ${table}: missing user_id or log_date`, {
-      userId: user_id, sessionUid: session.user.id, table, method: 'none', status: 'missing fields'
+      userId: user_id, sessionUid: session.user.id, table, method: 'none', status: 'missing fields',
+      patch_response: 'n/a', patch_rows: 'n/a'
     });
     return { ok: false, err: 'missing user_id or log_date' };
   }
   try {
-    // PATCH first — returns representation so we can confirm a row was hit
+    // PATCH first — Prefer: return=representation so empty array means no row matched
     console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: PATCH');
     const patchR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
       method: 'PATCH',
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
       body: JSON.stringify(data)
     });
+    const patchStatus = patchR.status;
     if (!patchR.ok) {
       const err = await patchR.json().catch(() => ({ message: patchR.statusText }));
       const detail = err.message || err.details || err.code || patchR.statusText;
       showErrorModal(`Save failed ${table}: HTTP ${patchR.status} — ${detail}`, {
-        userId: user_id, sessionUid: session.user.id, table, method: 'PATCH', status: patchR.status
+        userId: user_id, sessionUid: session.user.id, table, method: 'PATCH', status: patchR.status,
+        patch_response: patchStatus, patch_rows: 'n/a'
       });
       return { ok: false, err: detail };
     }
     const patched = await patchR.json().catch(() => []);
-    if (patched.length > 0) return { ok: true };
-    // No existing row matched — INSERT
+    const patchRows = patched.length;
+    if (patchRows > 0) return { ok: true };
+    // PATCH returned 200 + empty array — no row exists yet, INSERT
     console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: POST');
     const postR = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
@@ -1211,30 +1217,19 @@ async function supaUpsert(table, data) {
       body: JSON.stringify(data)
     });
     if (!postR.ok) {
-      if (postR.status === 409) {
-        // Row appeared between our PATCH check and POST — retry PATCH once
-        console.log('[supaUpsert] user_id:', user_id, 'table:', table, 'op: PATCH retry (409)');
-        const retryR = await fetch(`${SUPA_URL}/rest/v1/${table}?user_id=eq.${user_id}&log_date=eq.${log_date}`, {
-          method: 'PATCH',
-          headers: { ...getHeaders(), 'Prefer': 'return=representation' },
-          body: JSON.stringify(data)
-        });
-        if (retryR.ok) {
-          const retried = await retryR.json().catch(() => []);
-          if (retried.length > 0) return { ok: true };
-        }
-      }
       const err = await postR.json().catch(() => ({ message: postR.statusText }));
       const detail = err.message || err.details || err.code || postR.statusText;
       showErrorModal(`Save failed ${table}: HTTP ${postR.status} — ${detail}`, {
-        userId: user_id, sessionUid: session.user.id, table, method: 'POST', status: postR.status
+        userId: user_id, sessionUid: session.user.id, table, method: 'POST', status: postR.status,
+        patch_response: patchStatus, patch_rows: patchRows
       });
       return { ok: false, err: detail };
     }
     return { ok: true };
   } catch(e) {
     showErrorModal(`Save failed ${table}: ${e.message}`, {
-      userId: user_id, sessionUid: session?.user?.id, table, method: 'unknown', status: 'exception'
+      userId: user_id, sessionUid: session?.user?.id, table, method: 'unknown', status: 'exception',
+      patch_response: 'n/a', patch_rows: 'n/a'
     });
     return { ok: false, err: e.message };
   }
@@ -3288,11 +3283,13 @@ function showErrorModal(msg, diag = null) {
     const d = document.createElement('div');
     d.className = 'err-diag';
     d.textContent = [
-      `user_id:     ${diag.userId ?? 'undefined'}`,
-      `session uid: ${diag.sessionUid ?? 'undefined'}`,
-      `table:       ${diag.table ?? 'unknown'}`,
-      `method:      ${diag.method ?? 'unknown'}`,
-      `status:      ${diag.status ?? 'unknown'}`,
+      `user_id:        ${diag.userId ?? 'undefined'}`,
+      `session uid:    ${diag.sessionUid ?? 'undefined'}`,
+      `table:          ${diag.table ?? 'unknown'}`,
+      `method:         ${diag.method ?? 'unknown'}`,
+      `status:         ${diag.status ?? 'unknown'}`,
+      `patch_response: ${diag.patch_response ?? 'n/a'}`,
+      `patch_rows:     ${diag.patch_rows ?? 'n/a'}`,
     ].join('\n');
     overlay.querySelector('.err-body').after(d);
   }
