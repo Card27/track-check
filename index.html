@@ -581,6 +581,17 @@ select:focus{outline:none;border-color:var(--amber)}
 .sched-save-btn{background:var(--amber);color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;letter-spacing:.8px;padding:8px 0;width:100%;cursor:pointer}
 .sched-rest-day{text-align:center;padding:22px 0;color:var(--dim);font-size:13px;font-style:italic}
 .sched-manage-link{text-align:center;padding:10px 0 4px;font-size:11px;color:var(--dim);cursor:pointer;text-decoration:underline}
+.sched-cardio-row{display:flex;gap:8px;margin-bottom:8px}
+.sched-cardio-field{flex:1;display:flex;flex-direction:column;gap:3px}
+.sched-cardio-label{font-size:10px;color:var(--dim);font-family:var(--font-mono);letter-spacing:.3px;text-align:center}
+.sched-cardio-inp{background:var(--s3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px;font-family:var(--font-mono);width:100%;padding:5px 0;text-align:center;box-sizing:border-box}
+.sched-interval-link{font-size:11px;color:var(--amber);cursor:pointer;background:none;border:none;padding:2px 0 6px;text-align:left;display:block}
+.sched-interval-seg{display:flex;gap:6px;align-items:flex-end;padding:8px 0;border-bottom:1px solid var(--border)}
+.sched-interval-seg:last-child{border-bottom:none}
+.sched-interval-num{font-size:10px;color:var(--dim);font-family:var(--font-mono);width:18px;flex-shrink:0;padding-bottom:9px}
+.sched-interval-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:0 0 7px;flex-shrink:0;line-height:1}
+.sched-add-seg-btn{font-size:11px;color:var(--dim);cursor:pointer;border:1px dashed var(--border);border-radius:6px;background:none;width:100%;padding:7px;text-align:center;margin:6px 0 4px}
+.sched-remove-intervals{font-size:11px;color:var(--red);cursor:pointer;background:none;border:none;padding:0 0 2px;text-align:left;display:block}
 /* Week Management Sheet */
 .week-mgmt-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--s1);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 16px 34px;z-index:400;transform:translateY(100%);transition:transform .25s;max-width:480px;margin:0 auto}
 .week-mgmt-sheet.open{transform:translateY(0)}
@@ -2193,6 +2204,8 @@ function renderScheduledWorkout() {
   const progressIncrement = parseFloat(currentSchedule.progress_increment) || 5;
   const progressUnit = currentSchedule.progress_unit || 'lbs';
 
+  const CARDIO_NAMES = ['walk', 'jog', 'run', 'bike'];
+
   let cardsHtml = exercises.map(ex => {
     const exId = ex.id;
     const state = schedExState[exId] || {};
@@ -2200,20 +2213,87 @@ function renderScheduledWorkout() {
     const exSaved = saved[exId] || {};
     const isDone = exSaved.done || false;
 
-    const isTimed   = !!ex.time && !ex.sets && !ex.reps;
+    const isTimed    = !!ex.time && !ex.sets && !ex.reps;
     const isSetsHold = !!ex.sets && !!ex.time && !ex.reps;
     const isSetsReps = !!ex.sets && !!ex.reps;
-    const hasCustom = !!(ex.custom_name && ex.custom_name.trim());
+    const isCardio   = isTimed && CARDIO_NAMES.includes((ex.name || '').toLowerCase().trim());
+    const hasCustom  = !!(ex.custom_name && ex.custom_name.trim());
+
+    // Cardio state helpers
+    const cs = state.cardio || {};
+    const savedIsCardio = exSaved.type === 'cardio';
+    const cGet = (f) => cs[f] !== undefined ? cs[f] : (savedIsCardio && exSaved[f] !== undefined ? exSaved[f] : '');
+    const intervalMode = isCardio && (cs.intervalMode !== undefined ? cs.intervalMode : !!(savedIsCardio && exSaved.intervals?.length));
+    const segs = isCardio ? (cs.intervals !== undefined ? cs.intervals : (savedIsCardio ? (exSaved.intervals || []) : [])) : [];
 
     // Badge text
     let badgeText;
-    if (isTimed)    badgeText = `${ex.time} min`;
-    else if (isSetsHold) badgeText = `${ex.sets}×${ex.time}min`;
-    else            badgeText = `${ex.sets||3}×${ex.reps||'?'}`;
+    if (isCardio) {
+      if (intervalMode && segs.length) {
+        const totalDur = segs.reduce((s, sg) => s + (parseFloat(sg.duration) || 0), 0);
+        badgeText = `${segs.length} intervals · ${totalDur} min`;
+      } else {
+        const dur = cGet('duration'), spd = cGet('speed'), inc = cGet('incline');
+        const parts = [];
+        if (dur !== '') parts.push(`${dur} min`);
+        if (spd !== '') parts.push(`${spd} mph`);
+        if (inc !== '') parts.push(`${inc}%`);
+        badgeText = parts.length ? parts.join(' · ') : `${ex.time || '?'} min`;
+      }
+    } else if (isTimed)    badgeText = `${ex.time} min`;
+    else if (isSetsHold)   badgeText = `${ex.sets}×${ex.time}min`;
+    else                   badgeText = `${ex.sets||3}×${ex.reps||'?'}`;
 
     // Build body rows
     let setsHtml = '';
-    if (isTimed) {
+    if (isCardio) {
+      if (intervalMode) {
+        const segsHtml = segs.map((seg, i) => `
+          <div class="sched-interval-seg">
+            <div class="sched-interval-num">${i+1}</div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">MIN</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" placeholder="5" value="${seg.duration ?? ''}"
+                onchange="schedCardioSegField('${exId}',${i},'duration',this.value)">
+            </div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">MPH</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.1" placeholder="3.0" value="${seg.speed ?? ''}"
+                onchange="schedCardioSegField('${exId}',${i},'speed',this.value)">
+            </div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">INCLINE</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.5" placeholder="1.0" value="${seg.incline ?? ''}"
+                onchange="schedCardioSegField('${exId}',${i},'incline',this.value)">
+            </div>
+            <button class="sched-interval-del" onclick="schedCardioRemoveSeg('${exId}',${i})">✕</button>
+          </div>`).join('');
+        setsHtml = `
+          <div>${segsHtml}</div>
+          <button class="sched-add-seg-btn" onclick="schedCardioAddSeg('${exId}')">+ Add Segment</button>
+          <button class="sched-remove-intervals" onclick="schedCardioToggleInterval('${exId}')">✕ Remove intervals</button>`;
+      } else {
+        setsHtml = `
+          <div class="sched-cardio-row">
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">DURATION (min)</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" placeholder="${ex.time || '30'}" value="${cGet('duration')}"
+                onchange="schedCardioField('${exId}','duration',this.value)">
+            </div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">SPEED (mph)</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.1" placeholder="3.0" value="${cGet('speed')}"
+                onchange="schedCardioField('${exId}','speed',this.value)">
+            </div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">INCLINE (%)</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.5" placeholder="1.0" value="${cGet('incline')}"
+                onchange="schedCardioField('${exId}','incline',this.value)">
+            </div>
+          </div>
+          <button class="sched-interval-link" onclick="schedCardioToggleInterval('${exId}')">+ Add Intervals</button>`;
+      }
+    } else if (isTimed) {
       const stateSet = (state.sets || [])[0] || {};
       const savedSet = (exSaved.sets || [])[0] || {};
       const timeVal = stateSet.time !== undefined ? stateSet.time : (savedSet.time || '');
@@ -2321,6 +2401,47 @@ function schedSetField(exId, setIdx, field, val) {
   schedExState[exId].sets[setIdx][field] = val === '' ? '' : parseFloat(val) || val;
 }
 
+function schedCardioField(exId, field, val) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  if (!schedExState[exId].cardio) schedExState[exId].cardio = {};
+  schedExState[exId].cardio[field] = val === '' ? '' : parseFloat(val);
+}
+
+function schedCardioToggleInterval(exId) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  if (!schedExState[exId].cardio) schedExState[exId].cardio = {};
+  const on = !schedExState[exId].cardio.intervalMode;
+  schedExState[exId].cardio.intervalMode = on;
+  if (on && !schedExState[exId].cardio.intervals?.length) {
+    schedExState[exId].cardio.intervals = [{ duration: '', speed: '', incline: '' }];
+  } else if (!on) {
+    schedExState[exId].cardio.intervals = [];
+  }
+  renderScheduledWorkout();
+}
+
+function schedCardioAddSeg(exId) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  if (!schedExState[exId].cardio) schedExState[exId].cardio = {};
+  if (!schedExState[exId].cardio.intervals) schedExState[exId].cardio.intervals = [];
+  schedExState[exId].cardio.intervals.push({ duration: '', speed: '', incline: '' });
+  renderScheduledWorkout();
+}
+
+function schedCardioRemoveSeg(exId, idx) {
+  if (!schedExState[exId]?.cardio?.intervals) return;
+  schedExState[exId].cardio.intervals.splice(idx, 1);
+  renderScheduledWorkout();
+}
+
+function schedCardioSegField(exId, idx, field, val) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  if (!schedExState[exId].cardio) schedExState[exId].cardio = {};
+  if (!schedExState[exId].cardio.intervals) schedExState[exId].cardio.intervals = [];
+  if (!schedExState[exId].cardio.intervals[idx]) schedExState[exId].cardio.intervals[idx] = {};
+  schedExState[exId].cardio.intervals[idx][field] = val === '' ? '' : parseFloat(val);
+}
+
 async function schedExSaveOne(exId) {
   const exercises = getTodayScheduledExercises();
   const ex = exercises ? exercises.find(e => e.id === exId) : null;
@@ -2330,48 +2451,68 @@ async function schedExSaveOne(exId) {
   const isTimed    = !!ex.time && !ex.sets && !ex.reps;
   const isSetsHold = !!ex.sets && !!ex.time && !ex.reps;
   const hasCustom  = !!(ex.custom_name && ex.custom_name.trim());
-
-  let sets = [];
-  let allHitTarget = false;
-
-  if (isTimed) {
-    const s = (state.sets || [])[0] || {};
-    const timeVal = parseFloat(s.time) || 0;
-    sets = [{ time: timeVal, custom: parseFloat(s.custom) || 0 }];
-    allHitTarget = timeVal > 0;
-  } else if (isSetsHold) {
-    const numSets = ex.sets;
-    for (let i = 0; i < numSets; i++) {
-      const s = (state.sets || [])[i] || {};
-      sets.push({ time: parseFloat(s.time) || 0, custom: parseFloat(s.custom) || 0 });
-    }
-    const targetTime = parseFloat(ex.time) || 0;
-    allHitTarget = sets.every(s => s.time >= targetTime);
-  } else {
-    const numSets = ex.sets || 3;
-    for (let i = 0; i < numSets; i++) {
-      const s = (state.sets || [])[i] || {};
-      sets.push({ reps: parseFloat(s.reps) || 0, weight: parseFloat(s.weight) || 0 });
-    }
-    const targetReps = parseFloat(ex.reps) || 0;
-    allHitTarget = sets.every(s => s.reps >= targetReps && (!hasCustom || s.weight > 0));
-  }
+  const isCardio   = isTimed && ['walk','jog','run','bike'].includes((ex.name||'').toLowerCase().trim());
 
   if (!currentEntry.workout.scheduledExercises) currentEntry.workout.scheduledExercises = {};
   const prev = currentEntry.workout.scheduledExercises[exId] || {};
   const prevConsec = prev.consecutive_successes || 0;
-  const newConsec = allHitTarget ? prevConsec + 1 : 0;
-
-  currentEntry.workout.scheduledExercises[exId] = {
-    done: true,
-    sets,
-    consecutive_successes: newConsec,
-    logged_at: new Date().toISOString()
-  };
-
-  // Keep open state, mark done
   if (!schedExState[exId]) schedExState[exId] = {};
   schedExState[exId].open = false;
+
+  if (isCardio) {
+    const cs = state.cardio || {};
+    const useIntervals = !!cs.intervalMode && (cs.intervals || []).length > 0;
+    let duration, speed, incline, intervals;
+    if (useIntervals) {
+      intervals = (cs.intervals || []).map(seg => ({
+        duration: parseFloat(seg.duration) || 0,
+        speed:    seg.speed    !== '' && seg.speed    != null ? parseFloat(seg.speed)    : null,
+        incline:  seg.incline  !== '' && seg.incline  != null ? parseFloat(seg.incline)  : null
+      }));
+      duration = intervals.reduce((sum, seg) => sum + seg.duration, 0);
+      speed = null; incline = null;
+    } else {
+      duration = parseFloat(cs.duration) || 0;
+      speed    = cs.speed   !== '' && cs.speed   != null ? parseFloat(cs.speed)   : null;
+      incline  = cs.incline !== '' && cs.incline != null ? parseFloat(cs.incline) : null;
+      intervals = [];
+    }
+    currentEntry.workout.scheduledExercises[exId] = {
+      name: ex.name, type: 'cardio', done: true, completed: true,
+      duration, speed, incline, intervals,
+      consecutive_successes: duration > 0 ? prevConsec + 1 : 0,
+      logged_at: new Date().toISOString()
+    };
+  } else {
+    let sets = [];
+    let allHitTarget = false;
+    if (isTimed) {
+      const s = (state.sets || [])[0] || {};
+      const timeVal = parseFloat(s.time) || 0;
+      sets = [{ time: timeVal, custom: parseFloat(s.custom) || 0 }];
+      allHitTarget = timeVal > 0;
+    } else if (isSetsHold) {
+      const numSets = ex.sets;
+      for (let i = 0; i < numSets; i++) {
+        const s = (state.sets || [])[i] || {};
+        sets.push({ time: parseFloat(s.time) || 0, custom: parseFloat(s.custom) || 0 });
+      }
+      allHitTarget = sets.every(s => s.time >= (parseFloat(ex.time) || 0));
+    } else {
+      const numSets = ex.sets || 3;
+      for (let i = 0; i < numSets; i++) {
+        const s = (state.sets || [])[i] || {};
+        sets.push({ reps: parseFloat(s.reps) || 0, weight: parseFloat(s.weight) || 0 });
+      }
+      const targetReps = parseFloat(ex.reps) || 0;
+      allHitTarget = sets.every(s => s.reps >= targetReps && (!hasCustom || s.weight > 0));
+    }
+    currentEntry.workout.scheduledExercises[exId] = {
+      done: true, sets,
+      consecutive_successes: allHitTarget ? prevConsec + 1 : 0,
+      logged_at: new Date().toISOString()
+    };
+  }
 
   await saveScheduledWorkout();
   renderScheduledWorkout();
