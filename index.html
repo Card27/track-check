@@ -392,6 +392,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .menu-overlay{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
 .menu-overlay.open{transform:translateX(0)}
 .menu-overlay.journal-panel{z-index:600}
+.menu-overlay.settings-panel{z-index:600}
+.menu-nav-row{display:flex;align-items:center;justify-content:space-between;padding:16px 14px;background:var(--s2);border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:8px;transition:border-color .15s}
+.menu-nav-row:active{border-color:var(--dim)}
+.menu-nav-label{font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--text)}
+.menu-nav-arrow{font-size:20px;color:var(--dim);line-height:1}
 .menu-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--s1)}
 .menu-hdr-title{font-family:var(--font-display);font-size:18px;letter-spacing:3px;color:var(--amber)}
 .menu-close{background:none;border:none;color:var(--text);font-size:26px;cursor:pointer;padding:0 4px;line-height:1}
@@ -1015,6 +1020,40 @@ select:focus{outline:none;border-color:var(--amber)}
     <button class="menu-close" onclick="closeMenu()">×</button>
   </div>
   <div class="menu-body">
+    <div class="menu-nav-row" onclick="openJournal()">
+      <span class="menu-nav-label">JOURNAL</span>
+      <span class="menu-nav-arrow">›</span>
+    </div>
+    <div class="menu-nav-row" onclick="openSettings()">
+      <span class="menu-nav-label">SETTINGS</span>
+      <span class="menu-nav-arrow">›</span>
+    </div>
+  </div>
+</div>
+
+<!-- JOURNAL PANEL -->
+<div id="journalPanel" class="menu-overlay journal-panel">
+  <div class="menu-hdr">
+    <div class="menu-hdr-title">JOURNAL</div>
+    <button class="menu-close" onclick="closeJournal()">×</button>
+  </div>
+  <div class="menu-body">
+    <div id="journalDateLabel" style="font-family:var(--font-mono);font-size:12px;color:var(--dim);margin-bottom:16px"></div>
+    <textarea id="journalTextarea" rows="5" placeholder="What's on your mind..."
+      style="width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:var(--font-body);font-size:14px;resize:none;line-height:1.5;outline:none"></textarea>
+    <button class="save-btn" style="margin-top:10px;margin-bottom:20px" onclick="saveJournalEntry()">SAVE ENTRY</button>
+    <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px">TODAY'S ENTRIES</div>
+    <div id="journalEntriesList"></div>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settingsPanel" class="menu-overlay settings-panel">
+  <div class="menu-hdr">
+    <div class="menu-hdr-title">SETTINGS</div>
+    <button class="menu-close" onclick="closeSettings()">×</button>
+  </div>
+  <div class="menu-body">
     <div class="menu-section-hdr" style="margin-top:0">PROFILE</div>
     <div id="settingsProfileBody"><div class="empty-state">Loading...</div></div>
 
@@ -1025,9 +1064,6 @@ select:focus{outline:none;border-color:var(--amber)}
         onkeydown="if(event.key==='Enter')addTrigger()">
       <button class="trigger-add-btn" onclick="addTrigger()">ADD</button>
     </div>
-
-    <div class="menu-section-hdr">JOURNAL</div>
-    <button onclick="openJournal()" style="width:100%;text-align:left;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-family:var(--font-display);font-size:14px;letter-spacing:1.5px;cursor:pointer;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between">OPEN JOURNAL <span style="font-size:18px;color:var(--dim)">›</span></button>
 
     <div class="menu-section-hdr">WORKOUT SCHEDULE</div>
     <div id="scheduleStatus" style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:10px">No schedule uploaded</div>
@@ -1062,22 +1098,6 @@ select:focus{outline:none;border-color:var(--amber)}
     <button class="save-btn" style="margin-bottom:14px" onclick="saveProgressionDefaults()">SAVE PROGRESSION DEFAULTS</button>
 
     <button class="save-btn" style="background:var(--red)" onclick="handleSignOut()">SIGN OUT</button>
-  </div>
-</div>
-
-<!-- JOURNAL PANEL -->
-<div id="journalPanel" class="menu-overlay journal-panel">
-  <div class="menu-hdr">
-    <div class="menu-hdr-title">JOURNAL</div>
-    <button class="menu-close" onclick="closeJournal()">×</button>
-  </div>
-  <div class="menu-body">
-    <div id="journalDateLabel" style="font-family:var(--font-mono);font-size:12px;color:var(--dim);margin-bottom:16px"></div>
-    <textarea id="journalTextarea" rows="5" placeholder="What's on your mind..."
-      style="width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:var(--font-body);font-size:14px;resize:none;line-height:1.5;outline:none"></textarea>
-    <button class="save-btn" style="margin-top:10px;margin-bottom:20px" onclick="saveJournalEntry()">SAVE ENTRY</button>
-    <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px">TODAY'S ENTRIES</div>
-    <div id="journalEntriesList"></div>
   </div>
 </div>
 
@@ -4605,15 +4625,24 @@ async function upsertProfile(data) {
 // ═══════════════════════════════════════════════════════
 
 function openMenu() {
-  renderSettings();
-  renderTriggers();
-  renderScheduleStatus();
-  renderProgressionDefaults();
   document.getElementById('menuOverlay').classList.add('open');
 }
 
 function closeMenu() {
   document.getElementById('menuOverlay').classList.remove('open');
+}
+
+function openSettings() {
+  closeMenu();
+  renderSettings();
+  renderTriggers();
+  renderScheduleStatus();
+  renderProgressionDefaults();
+  document.getElementById('settingsPanel').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsPanel').classList.remove('open');
 }
 
 function getLocalDateStr(date = new Date()) {
@@ -4625,6 +4654,7 @@ function getLocalDateStr(date = new Date()) {
 
 function goToWorkout() {
   closeMenu();
+  closeSettings();
   const todayNav = document.querySelectorAll('.nav-btn')[1];
   switchPage('today', todayNav);
   const workoutTab = document.querySelector('.stab[onclick*="workout"]');
@@ -5201,6 +5231,7 @@ function renderDayView() {
 
 function openJournal() {
   closeMenu();
+  closeSettings();
   const today = new Date();
   const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const MON_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
