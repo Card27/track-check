@@ -422,6 +422,17 @@ select:focus{outline:none;border-color:var(--amber)}
 .mini-chart{height:60px;position:relative;margin-top:8px}
 .mini-chart svg{width:100%;height:100%}
 
+/* MOOD TRENDS */
+.mood-chart-wrap{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.mood-chart-wrap:last-child{margin-bottom:0}
+.mood-chart-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.mood-chart-name{font-family:var(--font-display);font-size:11px;letter-spacing:1.5px;color:var(--dim)}
+.mood-chart-today{font-family:var(--font-mono);font-size:11px;color:var(--text)}
+.insight-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--faint)}
+.insight-row:last-child{border-bottom:none;padding-bottom:0}
+.insight-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.insight-text{font-size:13px;color:var(--text);line-height:1.4}
+
 /* DAY VIEW */
 .dayview-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .dayview-back{background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 12px;font-family:var(--font-display);font-size:13px;letter-spacing:1px;cursor:pointer;flex-shrink:0}
@@ -958,6 +969,22 @@ select:focus{outline:none;border-color:var(--amber)}
           <div class="card-title">FLARE HISTORY</div>
         </div>
         <div class="card-body" id="flareHistory"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-icon">📈</div>
+          <div class="card-title">MOOD TRENDS</div>
+        </div>
+        <div class="card-body" id="moodTrendsBody"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-icon">🔍</div>
+          <div class="card-title">PATTERNS</div>
+        </div>
+        <div class="card-body" id="patternsBody"></div>
       </div>
     </div>
 
@@ -3027,6 +3054,260 @@ function renderWeekPage() {
           </div>
         </div>`;
       }).join('');
+
+  renderMoodTrends();
+  renderCorrelationsLite();
+}
+
+async function renderMoodTrends() {
+  const el = document.getElementById('moodTrendsBody');
+  if (!el || !USER_ID) return;
+
+  const today = new Date();
+  const d7 = new Date(today);
+  d7.setDate(d7.getDate() - 6);
+  const sevenDaysAgo = getLocalDateStr(d7);
+  const todayDateStr = getLocalDateStr(today);
+
+  const rows = await supaFetch('feeling_logs',
+    `user_id=eq.${USER_ID}&log_date=gte.${sevenDaysAgo}&order=log_date.asc`);
+
+  const DIMS = ['mental','physical','gut','energy','clarity','stress'];
+  const DIM_COLORS = {
+    mental:'var(--blue)', physical:'var(--green)', gut:'var(--purple)',
+    energy:'var(--amber)', clarity:'var(--dim)', stress:'var(--red)'
+  };
+
+  // Build 7-day date slots (oldest → newest)
+  const days7 = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days7.push(getLocalDateStr(d));
+  }
+
+  // Accumulate sums/counts per date+dim
+  const dayMap = {};
+  rows.forEach(r => {
+    if (!dayMap[r.log_date]) dayMap[r.log_date] = {};
+    DIMS.forEach(dim => {
+      if (r[dim] != null) {
+        if (!dayMap[r.log_date][dim]) dayMap[r.log_date][dim] = { sum: 0, cnt: 0 };
+        dayMap[r.log_date][dim].sum += Number(r[dim]);
+        dayMap[r.log_date][dim].cnt++;
+      }
+    });
+  });
+
+  const getAvg = (date, dim) => {
+    const e = dayMap[date]?.[dim];
+    return e ? e.sum / e.cnt : null;
+  };
+
+  const daysWithData = days7.filter(d => dayMap[d] && Object.keys(dayMap[d]).length > 0);
+  if (daysWithData.length < 2) {
+    el.innerHTML = '<div class="empty-state">Log a few days to see trends.</div>';
+    return;
+  }
+
+  const W = 300, H = 80;
+  const padT = 10, padB = 18, padL = 8, padR = 8;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const xp = i => padL + (i / 6) * innerW;
+  const yp = v => padT + innerH - ((v - 1) / 9) * innerH;
+  const dayLabels = days7.map(d =>
+    ['Su','Mo','Tu','We','Th','Fr','Sa'][new Date(d + 'T12:00:00').getDay()]
+  );
+  const xLabelsSvg = dayLabels.map((l, i) =>
+    `<text x="${xp(i).toFixed(1)}" y="${H - 3}" text-anchor="middle" font-size="8" fill="var(--dim)" font-family="JetBrains Mono,monospace">${l}</text>`
+  ).join('');
+
+  el.innerHTML = DIMS.map(dim => {
+    const color = DIM_COLORS[dim];
+    const points = days7.map((d, i) => {
+      const v = getAvg(d, dim);
+      return v != null ? { x: xp(i), y: yp(v) } : null;
+    });
+
+    // Build polyline segments (skip null gaps)
+    const segments = [];
+    let seg = [];
+    points.forEach(p => {
+      if (p) { seg.push(`${p.x.toFixed(1)},${p.y.toFixed(1)}`); }
+      else if (seg.length) { segments.push(seg); seg = []; }
+    });
+    if (seg.length) segments.push(seg);
+
+    const polylines = segments.map(s =>
+      `<polyline points="${s.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+    ).join('');
+    const circles = points.filter(Boolean).map(p =>
+      `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="${color}" stroke="var(--bg)" stroke-width="1.5"/>`
+    ).join('');
+
+    const todayVal = getAvg(todayDateStr, dim);
+    const todayDisplay = todayVal != null ? todayVal.toFixed(1) : '—';
+
+    return `<div class="mood-chart-wrap">
+      <div class="mood-chart-meta">
+        <span class="mood-chart-name">${dim.toUpperCase()}</span>
+        <span class="mood-chart-today">${todayDisplay}</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:80px;display:block">
+        ${xLabelsSvg}${polylines}${circles}
+      </svg>
+    </div>`;
+  }).join('');
+}
+
+async function renderCorrelationsLite() {
+  const el = document.getElementById('patternsBody');
+  if (!el || !USER_ID) return;
+
+  const today = new Date();
+  const d30 = new Date(today);
+  d30.setDate(d30.getDate() - 29);
+  const thirtyDaysAgo = getLocalDateStr(d30);
+
+  const rows = await supaFetch('feeling_logs',
+    `user_id=eq.${USER_ID}&log_date=gte.${thirtyDaysAgo}&order=log_date.asc`);
+
+  const DIMS = ['mental','physical','gut','energy','clarity','stress'];
+  const DIM_COLORS = {
+    mental:'var(--blue)', physical:'var(--green)', gut:'var(--purple)',
+    energy:'var(--amber)', clarity:'var(--dim)', stress:'var(--red)'
+  };
+
+  // Accumulate sums/counts per date+dim
+  const dayMap = {};
+  rows.forEach(r => {
+    if (!dayMap[r.log_date]) dayMap[r.log_date] = {};
+    DIMS.forEach(dim => {
+      if (r[dim] != null) {
+        if (!dayMap[r.log_date][dim]) dayMap[r.log_date][dim] = { sum: 0, cnt: 0 };
+        dayMap[r.log_date][dim].sum += Number(r[dim]);
+        dayMap[r.log_date][dim].cnt++;
+      }
+    });
+  });
+
+  const days30 = Object.keys(dayMap).sort().map(date => {
+    const entry = { date };
+    DIMS.forEach(dim => {
+      const e = dayMap[date][dim];
+      entry[dim] = e ? e.sum / e.cnt : null;
+    });
+    return entry;
+  });
+
+  if (days30.length < 7) {
+    el.innerHTML = '<div class="empty-state">Log at least a week of mood data to see patterns.</div>';
+    return;
+  }
+
+  const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const insights = [];
+
+  // 1. High vs low stress → energy comparison
+  const highStress = days30.filter(d => d.stress != null && d.stress >= 7);
+  const lowStress  = days30.filter(d => d.stress != null && d.stress <= 4);
+  if (highStress.length >= 3 && lowStress.length >= 3) {
+    const hsE = highStress.map(d => d.energy).filter(v => v != null);
+    const lsE = lowStress.map(d => d.energy).filter(v => v != null);
+    if (hsE.length >= 3 && lsE.length >= 3) {
+      insights.push({
+        text: `On high-stress days, your energy averages ${avg(hsE).toFixed(1)} vs ${avg(lsE).toFixed(1)} on calm days.`,
+        color: 'var(--blue)'
+      });
+    }
+  }
+
+  // 2. Highest/lowest dimension this week
+  const d7start = new Date(today);
+  d7start.setDate(d7start.getDate() - 6);
+  const sevenDaysAgoStr = getLocalDateStr(d7start);
+  const days7 = days30.filter(d => d.date >= sevenDaysAgoStr);
+  if (days7.length >= 2) {
+    const dimAvg7 = {};
+    DIMS.forEach(dim => {
+      const vals = days7.map(d => d[dim]).filter(v => v != null);
+      if (vals.length > 0) dimAvg7[dim] = avg(vals);
+    });
+    const validDims = Object.keys(dimAvg7);
+    if (validDims.length >= 2) {
+      const highDim = validDims.reduce((a, b) => dimAvg7[a] > dimAvg7[b] ? a : b);
+      const lowDim  = validDims.reduce((a, b) => dimAvg7[a] < dimAvg7[b] ? a : b);
+      if (highDim !== lowDim) {
+        insights.push({
+          text: `Your strongest dimension this week is ${cap(highDim)}. ${cap(lowDim)} is your lowest.`,
+          color: DIM_COLORS[highDim]
+        });
+      }
+    }
+  }
+
+  // 3. Mental and energy move together day-over-day ≥ 60%
+  if (days30.length >= 3) {
+    let sameDir = 0, total = 0;
+    for (let i = 1; i < days30.length; i++) {
+      const pM = days30[i-1].mental, cM = days30[i].mental;
+      const pE = days30[i-1].energy, cE = days30[i].energy;
+      if (pM != null && cM != null && pE != null && cE != null) {
+        const dM = cM - pM, dE = cE - pE;
+        const same = (dM > 0 && dE > 0) || (dM < 0 && dE < 0) || (dM === 0 && dE === 0);
+        if (same) sameDir++;
+        total++;
+      }
+    }
+    if (total >= 3 && sameDir / total >= 0.6) {
+      insights.push({
+        text: 'Your mental and energy scores tend to rise and fall together.',
+        color: 'var(--blue)'
+      });
+    }
+  }
+
+  // 4. Best day of week (≥ 2 occurrences)
+  const dowScores = {}, dowCounts = {};
+  days30.forEach(d => {
+    const dow = new Date(d.date + 'T12:00:00').getDay();
+    const vals = DIMS.map(dim => d[dim]).filter(v => v != null);
+    if (!vals.length) return;
+    dowScores[dow] = (dowScores[dow] || 0) + avg(vals);
+    dowCounts[dow] = (dowCounts[dow] || 0) + 1;
+  });
+  const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const validDows = Object.keys(dowCounts).filter(d => dowCounts[d] >= 2);
+  if (validDows.length > 0) {
+    const bestDow = validDows.reduce((a, b) =>
+      (dowScores[a] / dowCounts[a]) > (dowScores[b] / dowCounts[b]) ? a : b
+    );
+    insights.push({ text: `You tend to feel best on ${DOW_NAMES[bestDow]}.`, color: 'var(--blue)' });
+  }
+
+  // 5. Gut consistently low
+  const gutVals = days30.map(d => d.gut).filter(v => v != null);
+  if (gutVals.length >= 7 && avg(gutVals) <= 5) {
+    insights.push({
+      text: 'Your gut score has been consistently low — worth tracking triggers.',
+      color: 'var(--purple)'
+    });
+  }
+
+  if (insights.length === 0) {
+    el.innerHTML = '<div class="empty-state">Log more mood data to see patterns.</div>';
+    return;
+  }
+
+  el.innerHTML = insights.slice(0, 5).map(ins =>
+    `<div class="insight-row">
+      <div class="insight-dot" style="background:${ins.color}"></div>
+      <div class="insight-text">${ins.text}</div>
+    </div>`
+  ).join('');
 }
 
 function renderFeeling() {
