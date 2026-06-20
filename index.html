@@ -120,6 +120,7 @@
 <title>TRACK CHECK</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -947,8 +948,38 @@ select:focus{outline:none;border-color:var(--amber)}
       <button class="trigger-add-btn" onclick="addTrigger()">ADD</button>
     </div>
 
+    <div class="menu-section-hdr">WORKOUT SCHEDULE</div>
+    <div id="scheduleStatus" style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:10px">No schedule uploaded</div>
+    <input type="file" id="scheduleFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadWorkoutSchedule(this)">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <button class="save-btn" style="flex:1;min-width:120px;font-size:11px" onclick="document.getElementById('scheduleFileInput').click()">Upload Schedule (.xlsx)</button>
+      <button class="save-btn" style="flex:1;min-width:120px;font-size:11px;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="goToWorkout()">Manage Schedule</button>
+    </div>
+
     <div class="menu-section-hdr">APP SETTINGS</div>
     <div style="font-family:var(--font-mono);font-size:12px;color:var(--dim);margin-bottom:12px" id="settingsEmail">—</div>
+
+    <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">PROGRESSION DEFAULTS</div>
+    <div class="auth-field" style="margin-bottom:8px">
+      <label class="auth-label">PROGRESS AFTER ___ SESSIONS IN A ROW</label>
+      <input type="number" id="progressThreshold" class="auth-input" min="1" max="10" value="3">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="auth-field">
+        <label class="auth-label">DEFAULT INCREASE</label>
+        <input type="number" id="progressIncrement" class="auth-input" value="5" step="any">
+      </div>
+      <div class="auth-field">
+        <label class="auth-label">UNIT</label>
+        <select id="progressUnit" class="auth-input">
+          <option value="lbs">lbs</option>
+          <option value="kg">kg</option>
+          <option value="%">%</option>
+        </select>
+      </div>
+    </div>
+    <button class="save-btn" style="margin-bottom:14px" onclick="saveProgressionDefaults()">SAVE PROGRESSION DEFAULTS</button>
+
     <button class="save-btn" style="background:var(--red)" onclick="handleSignOut()">SIGN OUT</button>
   </div>
 </div>
@@ -1028,6 +1059,29 @@ select:focus{outline:none;border-color:var(--amber)}
       <div class="sheet-close" onclick="closeRecipeBuilder()">×</div>
     </div>
     <div class="sheet-body" id="rbContent"></div>
+  </div>
+</div>
+
+<!-- SCHEDULE RESET MODAL -->
+<div id="scheduleResetModal" class="overlay-centered">
+  <div class="modal-card">
+    <div id="scheduleResetStep1">
+      <div class="modal-title">Replace your current schedule?</div>
+      <div class="modal-sub" id="scheduleResetSub"></div>
+      <div class="modal-actions">
+        <button class="save-btn" style="flex:1" onclick="confirmReplaceSchedule()">Replace</button>
+        <button class="save-btn" style="flex:0 0 auto;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="cancelScheduleUpload()">Cancel</button>
+      </div>
+    </div>
+    <div id="scheduleResetStep2" style="display:none">
+      <div class="modal-title">Where would you like to start?</div>
+      <div class="modal-sub" id="scheduleWeekSub"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <button class="save-btn" onclick="confirmStartWeek(1)">Start fresh from Week 1</button>
+        <button class="save-btn" id="continueWeekBtn" style="background:var(--s3);color:var(--text);border:1px solid var(--border2)">Continue from current week</button>
+      </div>
+      <button onclick="cancelScheduleUpload()" style="display:block;margin-top:10px;background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;text-align:center;width:100%">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -1237,6 +1291,8 @@ let fsDetailSlot = 'breakfast';
 let rbAddingIngredient = false;
 let rbIngFood = null, rbIngUnit = 'g';
 let rbLogRecipe = null, rbLogSlot = 'lunch';
+let currentSchedule = null;
+let pendingScheduleData = null, pendingScheduleFilename = '';
 let recipeState = {name:'', ingredients:[], servings:1, step:1, _saved:false, _savedRecipe:null, _logServings:1};
 const UNIT_WEIGHTS = {g:1, oz:28.35, cup:240, tbsp:15, tsp:5, ml:1, piece:100, slice:30, serving:100};
 const TARGET_CAL = 1600, TARGET_PRO = 190, TARGET_CARB = 150, TARGET_FAT = 60;
@@ -1522,6 +1578,7 @@ async function loadApp() {
   updateHeader();
   currentProfile = await loadProfile();
   currentTriggers = (currentProfile?.triggers || []).filter(Boolean);
+  await loadWorkoutSchedule();
   allHistory = await stLoadAll();
   const saved = allHistory[todayStr];
   currentEntry = saved ? JSON.parse(JSON.stringify(saved)) : defaultEntry();
@@ -3715,11 +3772,214 @@ async function upsertProfile(data) {
 function openMenu() {
   renderSettings();
   renderTriggers();
+  renderScheduleStatus();
+  renderProgressionDefaults();
   document.getElementById('menuOverlay').classList.add('open');
 }
 
 function closeMenu() {
   document.getElementById('menuOverlay').classList.remove('open');
+}
+
+function getLocalDateStr(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function goToWorkout() {
+  closeMenu();
+  const todayNav = document.querySelectorAll('.nav-btn')[1];
+  switchPage('today', todayNav);
+  const workoutTab = document.querySelector('.stab[onclick*="workout"]');
+  if (workoutTab) switchSection('workout', workoutTab);
+}
+
+function renderScheduleStatus() {
+  const el = document.getElementById('scheduleStatus');
+  if (!el) return;
+  if (!currentSchedule) { el.textContent = 'No schedule uploaded'; return; }
+  const name = currentSchedule.name || 'Schedule';
+  const week = currentSchedule.current_week || 1;
+  const total = currentSchedule.total_weeks || '?';
+  el.textContent = `${name} — Week ${week} of ${total}`;
+}
+
+async function loadWorkoutSchedule() {
+  if (!USER_ID) return;
+  try {
+    const rows = await supaFetch('workout_schedules', `user_id=eq.${USER_ID}&limit=1`);
+    currentSchedule = rows[0] || null;
+  } catch(e) { currentSchedule = null; }
+}
+
+function uploadWorkoutSchedule(input) {
+  const file = input.files[0];
+  if (!file) return;
+  pendingScheduleFilename = file.name.replace(/\.[^.]+$/, '');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      if (!window.XLSX) { showToast('XLSX LIBRARY NOT LOADED'); return; }
+      const wb = XLSX.read(e.target.result, {type: 'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval: null});
+      const norm = rows.map(r => {
+        const out = {};
+        Object.keys(r).forEach(k => { out[k.toLowerCase().trim().replace(/\s+/g, '_')] = r[k]; });
+        return out;
+      });
+      const schedule = {};
+      let maxWeek = 0;
+      norm.forEach(row => {
+        const week = parseInt(row.week);
+        const day = (String(row.day || '')).toLowerCase().trim().slice(0, 3);
+        if (!week || !day) return;
+        maxWeek = Math.max(maxWeek, week);
+        if (!schedule[week]) schedule[week] = {};
+        if (!schedule[week][day]) schedule[week][day] = [];
+        const n = v => (v !== null && v !== '') ? parseFloat(v) : null;
+        const s = v => (v !== null && v !== '') ? String(v).trim() : null;
+        schedule[week][day].push({
+          id: crypto.randomUUID(),
+          name: s(row.workout_name) || s(row.name) || 'Exercise',
+          time: n(row.time),
+          sets: n(row.sets),
+          reps: n(row.reps),
+          custom_name: s(row.custom_name),
+          custom_amount: n(row.custom_amount),
+          custom_2_name: s(row.custom_2_name),
+          custom_2_amount: n(row.custom_2_amount),
+          progress_threshold: n(row.progress_threshold),
+          progress_increment: n(row.progress_increment),
+          video_link: s(row.video_link),
+        });
+      });
+      if (maxWeek === 0) { showToast('NO VALID ROWS FOUND'); return; }
+      pendingScheduleData = {schedule, total_weeks: maxWeek, name: pendingScheduleFilename, totalExercises: norm.length};
+      showScheduleResetModal();
+    } catch(err) {
+      showToast('PARSE ERROR — CHECK FILE FORMAT');
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showScheduleResetModal() {
+  const d = pendingScheduleData;
+  document.getElementById('scheduleResetSub').textContent =
+    `"${d.name}" — ${d.totalExercises} exercise${d.totalExercises !== 1 ? 's' : ''} across ${d.total_weeks} week${d.total_weeks !== 1 ? 's' : ''}`;
+  document.getElementById('scheduleResetStep1').style.display = '';
+  document.getElementById('scheduleResetStep2').style.display = 'none';
+  document.getElementById('scheduleResetModal').style.display = 'flex';
+}
+
+function cancelScheduleUpload() {
+  pendingScheduleData = null;
+  document.getElementById('scheduleResetModal').style.display = 'none';
+}
+
+function confirmReplaceSchedule() {
+  if (currentSchedule) {
+    const cw = currentSchedule.current_week || 1;
+    document.getElementById('scheduleWeekSub').textContent =
+      `Currently on Week ${cw} of ${currentSchedule.total_weeks || '?'}`;
+    const btn = document.getElementById('continueWeekBtn');
+    btn.textContent = `Continue from Week ${cw}`;
+    btn.onclick = () => confirmStartWeek(cw);
+    document.getElementById('scheduleResetStep1').style.display = 'none';
+    document.getElementById('scheduleResetStep2').style.display = '';
+  } else {
+    confirmStartWeek(1);
+  }
+}
+
+async function confirmStartWeek(startWeek) {
+  document.getElementById('scheduleResetModal').style.display = 'none';
+  const d = pendingScheduleData;
+  if (!d) return;
+  const threshold = parseInt(document.getElementById('progressThreshold')?.value) || 3;
+  const increment = parseFloat(document.getElementById('progressIncrement')?.value) || 5;
+  const unit = document.getElementById('progressUnit')?.value || 'lbs';
+  await saveWorkoutSchedule({
+    user_id: USER_ID,
+    name: d.name,
+    total_weeks: d.total_weeks,
+    current_week: startWeek,
+    week_start_date: getLocalDateStr(),
+    schedule: d.schedule,
+    progress_threshold: threshold,
+    progress_increment: increment,
+    progress_unit: unit,
+    updated_at: new Date().toISOString(),
+  });
+  pendingScheduleData = null;
+}
+
+async function saveWorkoutSchedule(payload) {
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) return;
+  if (session.access_token !== currentSession?.access_token) setSession(session);
+  const patchR = await fetch(`${SUPA_URL}/rest/v1/workout_schedules?user_id=eq.${USER_ID}`, {
+    method: 'PATCH',
+    headers: {...getHeaders(), 'Prefer': 'return=representation'},
+    body: JSON.stringify(payload)
+  });
+  if (patchR.ok) {
+    const patched = await patchR.json().catch(() => []);
+    if (patched.length > 0) {
+      currentSchedule = patched[0];
+      renderScheduleStatus();
+      showToast('SCHEDULE SAVED ✓');
+      return;
+    }
+  }
+  const postR = await fetch(`${SUPA_URL}/rest/v1/workout_schedules`, {
+    method: 'POST',
+    headers: {...getHeaders(), 'Prefer': 'return=representation'},
+    body: JSON.stringify({...payload, created_at: new Date().toISOString()})
+  });
+  if (postR.ok) {
+    const rows = await postR.json().catch(() => []);
+    currentSchedule = rows[0] || payload;
+    renderScheduleStatus();
+    showToast('SCHEDULE SAVED ✓');
+  } else {
+    showToast('SCHEDULE SAVE FAILED');
+  }
+}
+
+function renderProgressionDefaults() {
+  const src = currentSchedule || {};
+  const stored = JSON.parse(localStorage.getItem('progressionDefaults') || '{}');
+  const tEl = document.getElementById('progressThreshold');
+  const iEl = document.getElementById('progressIncrement');
+  const uEl = document.getElementById('progressUnit');
+  if (tEl) tEl.value = src.progress_threshold ?? stored.progress_threshold ?? 3;
+  if (iEl) iEl.value = src.progress_increment ?? stored.progress_increment ?? 5;
+  if (uEl) uEl.value = src.progress_unit ?? stored.progress_unit ?? 'lbs';
+}
+
+async function saveProgressionDefaults() {
+  const threshold = parseInt(document.getElementById('progressThreshold')?.value) || 3;
+  const increment = parseFloat(document.getElementById('progressIncrement')?.value) || 5;
+  const unit = document.getElementById('progressUnit')?.value || 'lbs';
+  if (currentSchedule) {
+    await saveWorkoutSchedule({
+      ...currentSchedule,
+      progress_threshold: threshold,
+      progress_increment: increment,
+      progress_unit: unit,
+      updated_at: new Date().toISOString(),
+    });
+  } else {
+    localStorage.setItem('progressionDefaults', JSON.stringify({
+      progress_threshold: threshold, progress_increment: increment, progress_unit: unit
+    }));
+    showToast('DEFAULTS SAVED LOCALLY ✓');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
