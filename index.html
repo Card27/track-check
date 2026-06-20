@@ -765,6 +765,8 @@ select:focus{outline:none;border-color:var(--amber)}
         </div>
       </div>
 
+      <div id="weather-bar" style="display:none; background:#111118; border:1px solid #222233; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-family:var(--font-mono); font-size:13px; color:var(--dim); letter-spacing:0.02em;"></div>
+
       <div id="dashFeelingWidget"></div>
 
       <div style="margin-bottom:12px">
@@ -1726,6 +1728,7 @@ async function loadApp() {
   if (!currentEntry.feeling) currentEntry.feeling = {logs:[]};
   if (!Array.isArray(currentEntry.feeling.logs)) currentEntry.feeling.logs = [];
   renderAll();
+  fetchAndLogWeather();
 }
 
 function getWeekNum() {
@@ -1753,6 +1756,86 @@ function updateHeader() {
 function renderAll() {
   [renderDash, renderWorkout, renderFood, renderMeds, renderWater, renderFlare, renderFeeling, renderBody, renderWeekPage]
     .forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
+}
+
+// ═══════════════════════════════════════════════════════
+// WEATHER
+// ═══════════════════════════════════════════════════════
+
+async function fetchAndLogWeather() {
+  try {
+    const pos = await new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
+    );
+    const { latitude: lat, longitude: lng } = pos.coords;
+
+    const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m` +
+      `&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+    const res = await fetch(omUrl);
+    if (!res.ok) return;
+    const data = await res.json();
+    const c = data.current;
+
+    const temp_f       = c.temperature_2m;
+    const feels_like_f = c.apparent_temperature;
+    const humidity     = c.relative_humidity_2m;
+    const pressure_hpa = c.surface_pressure;
+    const wind_speed_mph = c.wind_speed_10m;
+
+    const CODE_MAP = {
+      0:'Clear ☀️', 1:'Mostly Clear 🌤️', 2:'Partly Cloudy ⛅', 3:'Overcast ☁️',
+      45:'Foggy 🌫️', 48:'Foggy 🌫️',
+      51:'Rain 🌧️', 53:'Rain 🌧️', 55:'Rain 🌧️',
+      61:'Rain 🌧️', 63:'Rain 🌧️', 65:'Rain 🌧️',
+      71:'Snow 🌨️', 73:'Snow 🌨️', 75:'Snow 🌨️', 77:'Snow 🌨️',
+      80:'Rain 🌧️', 81:'Rain 🌧️', 82:'Rain 🌧️',
+      85:'Snow 🌨️', 86:'Snow 🌨️',
+      95:'Thunderstorm ⛈️', 96:'Thunderstorm ⛈️', 99:'Thunderstorm ⛈️'
+    };
+    const condition = CODE_MAP[c.weather_code] || 'Cloudy ☁️';
+
+    // Fetch yesterday pressure for trend
+    const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
+    let trend = '', trendColor = '';
+    try {
+      const yRes = await fetch(
+        `${SUPA_URL}/rest/v1/weather_logs?user_id=eq.${USER_ID}&log_date=eq.${yesterdayStr}&select=pressure_hpa`,
+        { headers: getHeaders() }
+      );
+      if (yRes.ok) {
+        const yData = await yRes.json();
+        if (yData.length > 0 && yData[0].pressure_hpa != null) {
+          const delta = pressure_hpa - yData[0].pressure_hpa;
+          if (delta > 2)      { trend = '↑ Rising';  trendColor = 'var(--green)'; }
+          else if (delta < -2){ trend = '↓ Falling'; trendColor = 'var(--red)'; }
+          else                { trend = '→ Stable';  trendColor = 'var(--dim)'; }
+        }
+      }
+    } catch (_) {}
+
+    // PATCH-first / POST-fallback to weather_logs
+    const todayDateStr = getLocalDateStr();
+    const payload = { temp_f, feels_like_f, humidity, pressure_hpa, wind_speed_mph, condition };
+    const patchR = await fetch(
+      `${SUPA_URL}/rest/v1/weather_logs?user_id=eq.${USER_ID}&log_date=eq.${todayDateStr}`,
+      { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) }
+    );
+    if (!patchR.ok) {
+      await fetch(`${SUPA_URL}/rest/v1/weather_logs`, {
+        method: 'POST',
+        headers: { ...getHeaders(), 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ user_id: USER_ID, log_date: todayDateStr, ...payload })
+      });
+    }
+
+    // Populate #weather-bar
+    const bar = document.getElementById('weather-bar');
+    if (!bar) return;
+    const trendHtml = trend ? `&nbsp;&nbsp;<span style="color:${trendColor}">${trend}</span>` : '';
+    bar.style.display = 'block';
+    bar.innerHTML = `${condition}&nbsp;&nbsp;${temp_f.toFixed(1)}°F&nbsp;&nbsp;💧${humidity}%&nbsp;&nbsp;⊕ ${pressure_hpa.toFixed(1)} hPa${trendHtml}`;
+  } catch (_) {}
 }
 
 // ═══════════════════════════════════════════════════════
