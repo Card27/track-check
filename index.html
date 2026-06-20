@@ -4271,15 +4271,31 @@ async function upsertProfile(data) {
       headers: { ...getHeaders(), 'Prefer': 'return=representation' },
       body: JSON.stringify(data)
     });
-    if (!patchR.ok) return { ok: false };
+    const patchStatus = patchR.status;
+    if (!patchR.ok) {
+      const patchBody = await patchR.text().catch(() => patchR.statusText);
+      showErrorModal(`Save failed profiles: HTTP ${patchStatus} — ${patchBody}`, {
+        userId: USER_ID, sessionUid: currentSession?.user?.id, table: 'profiles',
+        method: 'PATCH', status: patchStatus, patch_response: patchStatus, patch_rows: 'n/a'
+      });
+      return { ok: false };
+    }
     const patched = await patchR.json().catch(() => []);
     if (patched.length > 0) return { ok: true };
     const postR = await fetch(`${SUPA_URL}/rest/v1/profiles`, {
       method: 'POST',
       headers: { ...getHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ id: USER_ID, ...data })
     });
-    return { ok: postR.ok };
+    if (!postR.ok) {
+      const postBody = await postR.text().catch(() => postR.statusText);
+      showErrorModal(`Save failed profiles: HTTP ${postR.status} — ${postBody}`, {
+        userId: USER_ID, sessionUid: currentSession?.user?.id, table: 'profiles',
+        method: 'POST', status: postR.status, patch_response: patchStatus, patch_rows: patched.length
+      });
+      return { ok: false };
+    }
+    return { ok: true };
   } catch(e) { return { ok: false }; }
 }
 
