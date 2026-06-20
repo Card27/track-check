@@ -559,6 +559,40 @@ select:focus{outline:none;border-color:var(--amber)}
 .recipe-step-hdr{font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .recipe-ing-item{background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;margin-bottom:5px;display:flex;align-items:center;gap:8px;font-size:12px}
 .recipe-ing-del{margin-left:auto;color:var(--dim);cursor:pointer;font-size:18px;padding:0 4px}
+/* Scheduled Workout UI */
+.sched-week-pill{display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px}
+.sched-week-pill-label{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--dim);text-transform:uppercase}
+.sched-week-pill-val{font-size:13px;font-weight:700;color:var(--text)}
+.sched-week-pill-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--amber);font-size:10px;font-weight:700;letter-spacing:.6px;padding:4px 9px;cursor:pointer}
+.sched-ex-card{background:var(--s2);border:1px solid var(--border);border-radius:9px;margin-bottom:8px;overflow:hidden}
+.sched-ex-hdr{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer}
+.sched-check{width:20px;height:20px;border-radius:5px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s}
+.sched-check.done{background:var(--green);border-color:var(--green);color:#fff}
+.sched-check.done::after{content:'✓';font-size:12px;font-weight:700}
+.sched-ex-name{flex:1;font-size:13px;font-weight:600;color:var(--text)}
+.sched-ex-badge{font-size:10px;color:var(--dim);font-family:var(--font-mono)}
+.sched-ex-body{display:none;padding:0 13px 13px}
+.sched-ex-body.open{display:block}
+.sched-ex-sets{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.sched-set-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
+.sched-set-label{width:44px;font-family:var(--font-mono);font-size:11px}
+.sched-set-inp{background:var(--s3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px;font-family:var(--font-mono);width:54px;padding:5px 7px;text-align:center}
+.sched-set-unit{font-size:11px;color:var(--dim);width:20px}
+.sched-save-btn{background:var(--amber);color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;letter-spacing:.8px;padding:8px 0;width:100%;cursor:pointer}
+.sched-rest-day{text-align:center;padding:22px 0;color:var(--dim);font-size:13px;font-style:italic}
+.sched-manage-link{text-align:center;padding:10px 0 4px;font-size:11px;color:var(--dim);cursor:pointer;text-decoration:underline}
+/* Week Management Sheet */
+.week-mgmt-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--s1);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 16px 34px;z-index:400;transform:translateY(100%);transition:transform .25s;max-width:480px;margin:0 auto}
+.week-mgmt-sheet.open{transform:translateY(0)}
+.week-mgmt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.week-mgmt-week{font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--text)}
+.week-mgmt-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.week-mgmt-arrows{display:flex;gap:8px}
+.week-mgmt-arrow{background:var(--s2);border:1px solid var(--border);border-radius:7px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text)}
+.week-mgmt-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.week-mgmt-btn{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;padding:11px 14px;cursor:pointer;text-align:left}
+.week-mgmt-btn.primary{background:var(--amber);border-color:var(--amber);color:#fff}
+.week-mgmt-btn.danger{color:var(--red);border-color:var(--red)}
 </style>
 </head>
 <body>
@@ -748,14 +782,19 @@ select:focus{outline:none;border-color:var(--amber)}
 
       <!-- WORKOUT SECTION -->
       <div id="section-workout">
-        <div class="workout-day-hdr">
-          <div class="workout-type" id="workoutTypeLabel">PUSH DAY</div>
-          <div class="card-badge" id="workoutDayBadge">MON</div>
+        <!-- Scheduled workout UI (shown when schedule is loaded) -->
+        <div id="schedWorkoutUI" style="display:none"></div>
+        <!-- Legacy manual workout UI -->
+        <div id="legacyWorkoutUI">
+          <div class="workout-day-hdr">
+            <div class="workout-type" id="workoutTypeLabel">PUSH DAY</div>
+            <div class="card-badge" id="workoutDayBadge">MON</div>
+          </div>
+          <div id="exerciseList"></div>
+          <div id="cardioList"></div>
+          <textarea class="notes-area" id="workoutNotes" placeholder="Workout notes — how did it feel? Any joint issues?"></textarea>
+          <button class="save-btn" style="margin-top:10px" onclick="saveSection('workout')">SAVE WORKOUT</button>
         </div>
-        <div id="exerciseList"></div>
-        <div id="cardioList"></div>
-        <textarea class="notes-area" id="workoutNotes" placeholder="Workout notes — how did it feel? Any joint issues?"></textarea>
-        <button class="save-btn" style="margin-top:10px" onclick="saveSection('workout')">SAVE WORKOUT</button>
       </div>
 
       <!-- FOOD SECTION -->
@@ -1123,6 +1162,29 @@ select:focus{outline:none;border-color:var(--amber)}
   </div>
 </div>
 
+<!-- WEEK MANAGEMENT SHEET -->
+<div id="weekMgmtSheet" class="week-mgmt-sheet">
+  <div class="sheet-hdr">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.8px">WEEK MANAGEMENT</div>
+    <div class="sheet-close" onclick="closeWeekMgmt()">✕</div>
+  </div>
+  <div class="week-mgmt-row" style="margin-top:14px">
+    <div>
+      <div class="week-mgmt-week" id="wmWeekLabel">WEEK 1</div>
+      <div class="week-mgmt-sub" id="wmWeekDateRange"></div>
+    </div>
+    <div class="week-mgmt-arrows">
+      <div class="week-mgmt-arrow" onclick="wmShift(-1)">‹</div>
+      <div class="week-mgmt-arrow" onclick="wmShift(1)">›</div>
+    </div>
+  </div>
+  <div class="week-mgmt-actions">
+    <button class="week-mgmt-btn primary" onclick="wmAdvanceWeek()">ADVANCE TO NEXT WEEK</button>
+    <button class="week-mgmt-btn" onclick="wmSetWeek()">SET AS CURRENT WEEK</button>
+    <button class="week-mgmt-btn danger" onclick="wmResetWeek()">RESET TO WEEK 1</button>
+  </div>
+</div>
+
 <div class="toast" id="toast">SAVED ✓</div>
 
 <script>
@@ -1293,6 +1355,7 @@ let rbIngFood = null, rbIngUnit = 'g';
 let rbLogRecipe = null, rbLogSlot = 'lunch';
 let currentSchedule = null;
 let pendingScheduleData = null, pendingScheduleFilename = '';
+let schedExState = {}; // { exId: { sets:[{reps,weight},...], open:bool } }
 let recipeState = {name:'', ingredients:[], servings:1, step:1, _saved:false, _savedRecipe:null, _logServings:1};
 const UNIT_WEIGHTS = {g:1, oz:28.35, cup:240, tbsp:15, tsp:5, ml:1, piece:100, slice:30, serving:100};
 const TARGET_CAL = 1600, TARGET_PRO = 190, TARGET_CARB = 150, TARGET_FAT = 60;
@@ -1310,7 +1373,7 @@ function defaultEntry() {
   return {
     date: todayStr,
     weight: null,
-    workout: { exercises:{}, cardio:{}, stab:{}, notes:'' },
+    workout: { exercises:{}, cardio:{}, stab:{}, notes:'', scheduledExercises:{} },
     food: { meals:{}, cheats:{}, notes:'' },
     meds: {},
     water: { total:0, log:[] },
@@ -1453,7 +1516,7 @@ async function supaDelete(table, filter) {
 function mergeDay(dateStr, w, feelings, f, s, wt, fl, body) {
   const entry = defaultEntry();
   entry.date = dateStr;
-  if (w) entry.workout = { exercises: w.exercises||{}, cardio: w.cardio||{}, stab: w.stabilization||{}, notes: w.notes||'', day_type: w.day_type };
+  if (w) entry.workout = { exercises: w.exercises||{}, cardio: w.cardio||{}, stab: w.stabilization||{}, notes: w.notes||'', day_type: w.day_type, scheduledExercises: w.scheduled_exercises||{} };
   if (feelings.length) {
     entry.feeling.logs = feelings.map(r => ({
       time: new Date(r.logged_at).getTime(), _id: r.id,
@@ -1900,6 +1963,7 @@ function renderExercisesHtml(exercises) {
 }
 
 function renderWorkout() {
+  if (currentSchedule) { renderScheduledWorkout(); return; }
   const plan = getDayPlan(todayStr);
   const wk = getWeekNum();
   const isStrengthDay = ['push','pull','legs'].includes(plan.type);
@@ -2079,6 +2143,240 @@ function toggleStab(id) {
   if(!currentEntry.workout.stab) currentEntry.workout.stab = {};
   currentEntry.workout.stab[id] = !currentEntry.workout.stab[id];
   renderWorkout();
+}
+
+// ═══════════════════════════════════════════════════════
+// SCHEDULED WORKOUT UI
+// ═══════════════════════════════════════════════════════
+
+function getTodayScheduledExercises() {
+  if (!currentSchedule?.schedule) return null;
+  const week = currentSchedule.current_week || 1;
+  const dow = new Date().getDay(); // 0=Sun
+  const dayMap = [null,'mon','tue','wed','thu','fri','sat','sun'];
+  const dayKey = dayMap[dow] || null;
+  if (!dayKey) return [];
+  const weekData = currentSchedule.schedule[week] || currentSchedule.schedule[String(week)] || {};
+  return weekData[dayKey] || [];
+}
+
+function renderScheduledWorkout() {
+  const schedUI = document.getElementById('schedWorkoutUI');
+  const legacyUI = document.getElementById('legacyWorkoutUI');
+  if (!schedUI || !legacyUI) return;
+  schedUI.style.display = '';
+  legacyUI.style.display = 'none';
+
+  const exercises = getTodayScheduledExercises();
+  const cw = currentSchedule.current_week || 1;
+  const totalWeeks = currentSchedule.total_weeks || 1;
+
+  // Week pill
+  let weekPillHtml = `
+    <div class="sched-week-pill">
+      <div>
+        <div class="sched-week-pill-label">CURRENT WEEK</div>
+        <div class="sched-week-pill-val">WEEK ${cw} of ${totalWeeks}</div>
+      </div>
+      <button class="sched-week-pill-btn" onclick="openWeekMgmt()">MANAGE</button>
+    </div>`;
+
+  if (!exercises || exercises.length === 0) {
+    schedUI.innerHTML = weekPillHtml +
+      `<div class="sched-rest-day">Rest day — no exercises scheduled for today.</div>
+       <div class="sched-manage-link" onclick="openWeekMgmt()">Manage Schedule</div>`;
+    return;
+  }
+
+  const saved = currentEntry.workout.scheduledExercises || {};
+  const progressThreshold = currentSchedule.progress_threshold || 3;
+  const progressIncrement = parseFloat(currentSchedule.progress_increment) || 5;
+  const progressUnit = currentSchedule.progress_unit || 'lbs';
+
+  let cardsHtml = exercises.map(ex => {
+    const exId = ex.id;
+    const state = schedExState[exId] || {};
+    const isOpen = state.open || false;
+    const exSaved = saved[exId] || {};
+    const isDone = exSaved.done || false;
+
+    // Build set rows
+    const numSets = ex.sets || 3;
+    const targetReps = ex.reps || '—';
+    const prevWeight = exSaved.sets ? exSaved.sets[0]?.weight : null;
+    const suggestedWeight = prevWeight != null ? prevWeight : (ex.custom_amount || null);
+
+    let setsHtml = '';
+    for (let i = 0; i < numSets; i++) {
+      const stateSet = (state.sets || [])[i] || {};
+      const savedSet = (exSaved.sets || [])[i] || {};
+      const repsVal = stateSet.reps !== undefined ? stateSet.reps : (savedSet.reps || '');
+      const weightVal = stateSet.weight !== undefined ? stateSet.weight : (savedSet.weight || (suggestedWeight || ''));
+      setsHtml += `
+        <div class="sched-set-row">
+          <div class="sched-set-label">SET ${i+1}</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${targetReps}" value="${repsVal}"
+            onchange="schedSetField('${exId}',${i},'reps',this.value)"> <div class="sched-set-unit">reps</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${suggestedWeight || '0'}" value="${weightVal}"
+            onchange="schedSetField('${exId}',${i},'weight',this.value)"> <div class="sched-set-unit">${progressUnit}</div>
+        </div>`;
+    }
+
+    // Progression status
+    let progressBadge = '';
+    if (exSaved.consecutive_successes >= progressThreshold) {
+      progressBadge = `<span style="font-size:10px;color:var(--green);margin-left:6px">↑ +${progressIncrement}${progressUnit}</span>`;
+    }
+
+    const checkClass = isDone ? 'sched-check done' : 'sched-check';
+    const bodyClass = isOpen ? 'sched-ex-body open' : 'sched-ex-body';
+
+    return `
+      <div class="sched-ex-card" id="schedCard_${exId}">
+        <div class="sched-ex-hdr" onclick="schedExToggle('${exId}')">
+          <div class="${checkClass}" id="schedCheck_${exId}"></div>
+          <div class="sched-ex-name">${escHtml(ex.name)}${progressBadge}</div>
+          <div class="sched-ex-badge">${ex.sets||3}×${ex.reps||'?'}</div>
+        </div>
+        <div class="${bodyClass}" id="schedBody_${exId}">
+          <div class="sched-ex-sets">${setsHtml}</div>
+          <button class="sched-save-btn" onclick="schedExSaveOne('${exId}')">SAVE</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  schedUI.innerHTML = weekPillHtml + cardsHtml +
+    `<div class="sched-manage-link" onclick="openWeekMgmt()">Manage Schedule</div>`;
+}
+
+function schedExToggle(exId) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  schedExState[exId].open = !schedExState[exId].open;
+  renderScheduledWorkout();
+}
+
+function schedSetField(exId, setIdx, field, val) {
+  if (!schedExState[exId]) schedExState[exId] = {};
+  if (!schedExState[exId].sets) schedExState[exId].sets = [];
+  if (!schedExState[exId].sets[setIdx]) schedExState[exId].sets[setIdx] = {};
+  schedExState[exId].sets[setIdx][field] = val === '' ? '' : parseFloat(val) || val;
+}
+
+async function schedExSaveOne(exId) {
+  const exercises = getTodayScheduledExercises();
+  const ex = exercises ? exercises.find(e => e.id === exId) : null;
+  if (!ex) return;
+
+  const state = schedExState[exId] || {};
+  const numSets = ex.sets || 3;
+  const sets = [];
+  for (let i = 0; i < numSets; i++) {
+    const s = (state.sets || [])[i] || {};
+    sets.push({ reps: parseFloat(s.reps) || 0, weight: parseFloat(s.weight) || 0 });
+  }
+
+  const targetReps = parseFloat(ex.reps) || 0;
+  const allHitTarget = sets.every(s => s.reps >= targetReps && s.weight > 0);
+
+  if (!currentEntry.workout.scheduledExercises) currentEntry.workout.scheduledExercises = {};
+  const prev = currentEntry.workout.scheduledExercises[exId] || {};
+  const prevConsec = prev.consecutive_successes || 0;
+  const newConsec = allHitTarget ? prevConsec + 1 : 0;
+
+  currentEntry.workout.scheduledExercises[exId] = {
+    done: true,
+    sets,
+    consecutive_successes: newConsec,
+    logged_at: new Date().toISOString()
+  };
+
+  // Keep open state, mark done
+  if (!schedExState[exId]) schedExState[exId] = {};
+  schedExState[exId].open = false;
+
+  await saveScheduledWorkout();
+  renderScheduledWorkout();
+}
+
+async function saveScheduledWorkout() {
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) return;
+  if (session.access_token !== currentSession?.access_token) setSession(session);
+  const dateStr = getLocalDateStr();
+  const payload = {
+    exercises: currentEntry.workout.exercises || {},
+    cardio: currentEntry.workout.cardio || {},
+    stabilization: currentEntry.workout.stab || {},
+    scheduled_exercises: currentEntry.workout.scheduledExercises || {},
+    notes: currentEntry.workout.notes || '',
+    day_type: 'scheduled',
+    updated_at: new Date().toISOString()
+  };
+  const patchR = await fetch(
+    `${SUPA_URL}/rest/v1/workout_logs?user_id=eq.${USER_ID}&log_date=eq.${dateStr}`,
+    { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) }
+  );
+  if (patchR.ok) {
+    const rows = await patchR.json().catch(() => []);
+    if (rows.length > 0) { showToast('SAVED ✓'); return; }
+  }
+  const postR = await fetch(`${SUPA_URL}/rest/v1/workout_logs`, {
+    method: 'POST',
+    headers: { ...getHeaders(), 'Prefer': 'return=representation' },
+    body: JSON.stringify({ ...payload, user_id: USER_ID, log_date: dateStr, created_at: new Date().toISOString() })
+  });
+  if (postR.ok) { showToast('SAVED ✓'); } else { showToast('SAVE FAILED'); }
+}
+
+// Week Management Sheet
+function openWeekMgmt() {
+  const cw = currentSchedule?.current_week || 1;
+  const total = currentSchedule?.total_weeks || 1;
+  document.getElementById('wmWeekLabel').textContent = `WEEK ${cw}`;
+  document.getElementById('wmWeekDateRange').textContent = `of ${total} total weeks`;
+  document.getElementById('weekMgmtSheet').classList.add('open');
+}
+
+function closeWeekMgmt() {
+  document.getElementById('weekMgmtSheet').classList.remove('open');
+}
+
+function wmShift(dir) {
+  // Browse weeks (display only, does not change current_week)
+  const label = document.getElementById('wmWeekLabel');
+  const cur = parseInt(label.textContent.replace('WEEK ', '')) || 1;
+  const total = currentSchedule?.total_weeks || 1;
+  const next = Math.max(1, Math.min(total, cur + dir));
+  label.textContent = `WEEK ${next}`;
+}
+
+async function wmAdvanceWeek() {
+  if (!currentSchedule) return;
+  const cw = currentSchedule.current_week || 1;
+  const total = currentSchedule.total_weeks || 1;
+  if (cw >= total) { showToast('ALREADY ON FINAL WEEK'); return; }
+  await saveWorkoutSchedule({ current_week: cw + 1, week_start_date: getLocalDateStr(), updated_at: new Date().toISOString() });
+  closeWeekMgmt();
+  schedExState = {};
+  renderScheduledWorkout();
+}
+
+async function wmSetWeek() {
+  if (!currentSchedule) return;
+  const label = document.getElementById('wmWeekLabel');
+  const targetWeek = parseInt(label.textContent.replace('WEEK ', '')) || 1;
+  await saveWorkoutSchedule({ current_week: targetWeek, week_start_date: getLocalDateStr(), updated_at: new Date().toISOString() });
+  closeWeekMgmt();
+  schedExState = {};
+  renderScheduledWorkout();
+}
+
+async function wmResetWeek() {
+  if (!currentSchedule) return;
+  await saveWorkoutSchedule({ current_week: 1, week_start_date: getLocalDateStr(), updated_at: new Date().toISOString() });
+  closeWeekMgmt();
+  schedExState = {};
+  renderScheduledWorkout();
 }
 
 // ═══════════════════════════════════════════════════════
