@@ -2200,26 +2200,85 @@ function renderScheduledWorkout() {
     const exSaved = saved[exId] || {};
     const isDone = exSaved.done || false;
 
-    // Build set rows
-    const numSets = ex.sets || 3;
-    const targetReps = ex.reps || '—';
-    const prevWeight = exSaved.sets ? exSaved.sets[0]?.weight : null;
-    const suggestedWeight = prevWeight != null ? prevWeight : (ex.custom_amount || null);
+    const isTimed   = !!ex.time && !ex.sets && !ex.reps;
+    const isSetsHold = !!ex.sets && !!ex.time && !ex.reps;
+    const isSetsReps = !!ex.sets && !!ex.reps;
+    const hasCustom = !!(ex.custom_name && ex.custom_name.trim());
 
+    // Badge text
+    let badgeText;
+    if (isTimed)    badgeText = `${ex.time} min`;
+    else if (isSetsHold) badgeText = `${ex.sets}×${ex.time}min`;
+    else            badgeText = `${ex.sets||3}×${ex.reps||'?'}`;
+
+    // Build body rows
     let setsHtml = '';
-    for (let i = 0; i < numSets; i++) {
-      const stateSet = (state.sets || [])[i] || {};
-      const savedSet = (exSaved.sets || [])[i] || {};
-      const repsVal = stateSet.reps !== undefined ? stateSet.reps : (savedSet.reps || '');
-      const weightVal = stateSet.weight !== undefined ? stateSet.weight : (savedSet.weight || (suggestedWeight || ''));
-      setsHtml += `
+    if (isTimed) {
+      const stateSet = (state.sets || [])[0] || {};
+      const savedSet = (exSaved.sets || [])[0] || {};
+      const timeVal = stateSet.time !== undefined ? stateSet.time : (savedSet.time || '');
+      setsHtml = `
+        <div class="sched-set-row">
+          <div class="sched-set-label">Duration (min)</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${ex.time || ''}" value="${timeVal}"
+            onchange="schedSetField('${exId}',0,'time',this.value)">
+        </div>`;
+      if (hasCustom) {
+        const customVal = stateSet.custom !== undefined ? stateSet.custom : (savedSet.custom || (ex.custom_amount || ''));
+        setsHtml += `
+        <div class="sched-set-row">
+          <div class="sched-set-label">${escHtml(ex.custom_name).toUpperCase()}</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${ex.custom_amount || ''}" value="${customVal}"
+            onchange="schedSetField('${exId}',0,'custom',this.value)"> <div class="sched-set-unit">${progressUnit}</div>
+        </div>`;
+      }
+    } else if (isSetsHold) {
+      const numSets = ex.sets;
+      for (let i = 0; i < numSets; i++) {
+        const stateSet = (state.sets || [])[i] || {};
+        const savedSet = (exSaved.sets || [])[i] || {};
+        const timeVal = stateSet.time !== undefined ? stateSet.time : (savedSet.time || '');
+        setsHtml += `
+        <div class="sched-set-row">
+          <div class="sched-set-label">SET ${i+1}</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${ex.time || ''}" value="${timeVal}"
+            onchange="schedSetField('${exId}',${i},'time',this.value)"> <div class="sched-set-unit">min</div>
+        </div>`;
+      }
+      if (hasCustom) {
+        const stateCustom = (state.sets || [])[0] || {};
+        const savedCustom = (exSaved.sets || [])[0] || {};
+        const customVal = stateCustom.custom !== undefined ? stateCustom.custom : (savedCustom.custom || (ex.custom_amount || ''));
+        setsHtml += `
+        <div class="sched-set-row">
+          <div class="sched-set-label">${escHtml(ex.custom_name).toUpperCase()}</div>
+          <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${ex.custom_amount || ''}" value="${customVal}"
+            onchange="schedSetField('${exId}',0,'custom',this.value)"> <div class="sched-set-unit">${progressUnit}</div>
+        </div>`;
+      }
+    } else {
+      const numSets = ex.sets || 3;
+      const targetReps = ex.reps || '—';
+      const prevWeight = exSaved.sets ? exSaved.sets[0]?.weight : null;
+      const suggestedWeight = prevWeight != null ? prevWeight : (ex.custom_amount || null);
+      for (let i = 0; i < numSets; i++) {
+        const stateSet = (state.sets || [])[i] || {};
+        const savedSet = (exSaved.sets || [])[i] || {};
+        const repsVal = stateSet.reps !== undefined ? stateSet.reps : (savedSet.reps || '');
+        const weightVal = stateSet.weight !== undefined ? stateSet.weight : (savedSet.weight || (suggestedWeight || ''));
+        setsHtml += `
         <div class="sched-set-row">
           <div class="sched-set-label">SET ${i+1}</div>
           <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${targetReps}" value="${repsVal}"
-            onchange="schedSetField('${exId}',${i},'reps',this.value)"> <div class="sched-set-unit">reps</div>
+            onchange="schedSetField('${exId}',${i},'reps',this.value)"> <div class="sched-set-unit">reps</div>`;
+        if (hasCustom) {
+          setsHtml += `
           <input class="sched-set-inp" type="number" inputmode="decimal" placeholder="${suggestedWeight || '0'}" value="${weightVal}"
-            onchange="schedSetField('${exId}',${i},'weight',this.value)"> <div class="sched-set-unit">${progressUnit}</div>
+            onchange="schedSetField('${exId}',${i},'weight',this.value)"> <div class="sched-set-unit">${progressUnit}</div>`;
+        }
+        setsHtml += `
         </div>`;
+      }
     }
 
     // Progression status
@@ -2236,7 +2295,7 @@ function renderScheduledWorkout() {
         <div class="sched-ex-hdr" onclick="schedExToggle('${exId}')">
           <div class="${checkClass}" id="schedCheck_${exId}"></div>
           <div class="sched-ex-name">${escHtml(ex.name)}${progressBadge}</div>
-          <div class="sched-ex-badge">${ex.sets||3}×${ex.reps||'?'}</div>
+          <div class="sched-ex-badge">${badgeText}</div>
         </div>
         <div class="${bodyClass}" id="schedBody_${exId}">
           <div class="sched-ex-sets">${setsHtml}</div>
@@ -2268,15 +2327,35 @@ async function schedExSaveOne(exId) {
   if (!ex) return;
 
   const state = schedExState[exId] || {};
-  const numSets = ex.sets || 3;
-  const sets = [];
-  for (let i = 0; i < numSets; i++) {
-    const s = (state.sets || [])[i] || {};
-    sets.push({ reps: parseFloat(s.reps) || 0, weight: parseFloat(s.weight) || 0 });
-  }
+  const isTimed    = !!ex.time && !ex.sets && !ex.reps;
+  const isSetsHold = !!ex.sets && !!ex.time && !ex.reps;
+  const hasCustom  = !!(ex.custom_name && ex.custom_name.trim());
 
-  const targetReps = parseFloat(ex.reps) || 0;
-  const allHitTarget = sets.every(s => s.reps >= targetReps && s.weight > 0);
+  let sets = [];
+  let allHitTarget = false;
+
+  if (isTimed) {
+    const s = (state.sets || [])[0] || {};
+    const timeVal = parseFloat(s.time) || 0;
+    sets = [{ time: timeVal, custom: parseFloat(s.custom) || 0 }];
+    allHitTarget = timeVal > 0;
+  } else if (isSetsHold) {
+    const numSets = ex.sets;
+    for (let i = 0; i < numSets; i++) {
+      const s = (state.sets || [])[i] || {};
+      sets.push({ time: parseFloat(s.time) || 0, custom: parseFloat(s.custom) || 0 });
+    }
+    const targetTime = parseFloat(ex.time) || 0;
+    allHitTarget = sets.every(s => s.time >= targetTime);
+  } else {
+    const numSets = ex.sets || 3;
+    for (let i = 0; i < numSets; i++) {
+      const s = (state.sets || [])[i] || {};
+      sets.push({ reps: parseFloat(s.reps) || 0, weight: parseFloat(s.weight) || 0 });
+    }
+    const targetReps = parseFloat(ex.reps) || 0;
+    allHitTarget = sets.every(s => s.reps >= targetReps && (!hasCustom || s.weight > 0));
+  }
 
   if (!currentEntry.workout.scheduledExercises) currentEntry.workout.scheduledExercises = {};
   const prev = currentEntry.workout.scheduledExercises[exId] || {};
