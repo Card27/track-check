@@ -201,3 +201,4 @@ Cardio helper functions: `schedCardioField`, `schedCardioToggleInterval`, `sched
 [2026-06-20] Fixed: timed exercise card type detection (isTimed/isSetsHold/isCardio), renderScheduledWorkout, ~line 2203
 [2026-06-20] Fixed: ghost lbs input on exercises with no custom_name, renderScheduledWorkout, ~line 2277
 [2026-06-20] Added: cardio cards (Walk/Jog/Run/Bike) with speed/incline/interval mode, renderScheduledWorkout + schedExSaveOne, ~line 2210
+[2026-06-20] Added: weather bar on DASH (#weather-bar, fetchAndLogWeather), Open-Meteo geolocation, weather_logs PATCH/POST, pressure trend
