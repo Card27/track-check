@@ -314,6 +314,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .med-dose{font-size:11px;color:var(--dim);margin-top:1px}
 .med-icon{font-size:16px;flex-shrink:0}
 
+/* SUPPLEMENT SCHEDULE SETTINGS */
+.supp-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--faint)}
+.supp-row-info{flex:1;min-width:0}
+.supp-row-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.supp-row-meta{font-size:10px;color:var(--dim);margin-top:1px}
+.supp-row-btns{display:flex;gap:4px;flex-shrink:0}
+.supp-row-btn{background:var(--s3);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:10px;padding:3px 7px;cursor:pointer;font-family:var(--font-mono)}
+.supp-row-btn.del{color:var(--red);border-color:var(--red)}
+.day-check-row{display:flex;gap:4px;margin:6px 0}
+.day-cb-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.day-cb-wrap label{font-size:9px;color:var(--dim);font-family:var(--font-mono);text-transform:uppercase}
+.day-cb-wrap input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+
 /* WATER */
 .water-total{font-family:var(--font-display);font-size:48px;color:var(--blue);line-height:1;text-align:center;margin:10px 0 4px}
 .water-goal{font-size:11px;color:var(--dim);text-align:center;margin-bottom:12px;font-family:var(--font-mono)}
@@ -1075,6 +1088,48 @@ select:focus{outline:none;border-color:var(--amber)}
       <button class="save-btn" style="flex:1;min-width:120px;font-size:11px;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="goToWorkout()">Manage Schedule</button>
     </div>
 
+    <div class="menu-section-hdr">SUPPLEMENTS & MEDS</div>
+    <div id="suppSchedList" style="margin-bottom:8px"></div>
+    <button class="save-btn" style="width:100%;font-size:11px;margin-bottom:6px" onclick="showSuppForm()">+ Add Supplement / Med</button>
+    <div id="suppForm" style="display:none;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div class="auth-field" style="margin-bottom:8px">
+        <label class="auth-label">NAME</label>
+        <input type="text" id="suppName" class="auth-input" placeholder="e.g. Magnesium Glycinate">
+      </div>
+      <div class="auth-field" style="margin-bottom:8px">
+        <label class="auth-label">DOSAGE</label>
+        <input type="text" id="suppDosage" class="auth-input" placeholder="e.g. 400mg">
+      </div>
+      <div class="auth-field" style="margin-bottom:8px">
+        <label class="auth-label">TIME OF DAY</label>
+        <select id="suppTime" class="auth-input">
+          <option value="wake_up">Wake Up</option>
+          <option value="morning">Morning</option>
+          <option value="lunch">Lunch</option>
+          <option value="afternoon">Afternoon</option>
+          <option value="bedtime">Bedtime</option>
+        </select>
+      </div>
+      <label class="auth-label">DAYS</label>
+      <div class="day-check-row">
+        <div class="day-cb-wrap"><label>M</label><input type="checkbox" class="supp-day-cb" value="mon" checked></div>
+        <div class="day-cb-wrap"><label>T</label><input type="checkbox" class="supp-day-cb" value="tue" checked></div>
+        <div class="day-cb-wrap"><label>W</label><input type="checkbox" class="supp-day-cb" value="wed" checked></div>
+        <div class="day-cb-wrap"><label>T</label><input type="checkbox" class="supp-day-cb" value="thu" checked></div>
+        <div class="day-cb-wrap"><label>F</label><input type="checkbox" class="supp-day-cb" value="fri" checked></div>
+        <div class="day-cb-wrap"><label>S</label><input type="checkbox" class="supp-day-cb" value="sat" checked></div>
+        <div class="day-cb-wrap"><label>S</label><input type="checkbox" class="supp-day-cb" value="sun" checked></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0">
+        <label class="auth-label" style="margin:0">ACTIVE</label>
+        <input type="checkbox" id="suppActive" checked style="width:16px;height:16px;accent-color:var(--accent)">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="save-btn" style="flex:1;font-size:11px" onclick="saveSuppEntry()">SAVE</button>
+        <button class="save-btn" style="flex:0 0 auto;background:var(--s3);color:var(--text);border:1px solid var(--border2);font-size:11px" onclick="hideSuppForm()">CANCEL</button>
+      </div>
+    </div>
+
     <div class="menu-section-hdr">APP SETTINGS</div>
     <div style="font-family:var(--font-mono);font-size:12px;color:var(--dim);margin-bottom:12px" id="settingsEmail">—</div>
 
@@ -1478,6 +1533,8 @@ function getHeaders() {
 }
 
 let USER_ID = null;
+let supplementSchedule = [];
+let editingSuppId = null;
 
 async function supaFetch(table, params = '') {
   try {
@@ -1723,6 +1780,7 @@ async function loadApp() {
   currentProfile = await loadProfile();
   currentTriggers = (currentProfile?.triggers || []).filter(Boolean);
   await loadWorkoutSchedule();
+  await loadSupplementSchedule();
   allHistory = await stLoadAll();
   const saved = allHistory[todayStr];
   currentEntry = saved ? JSON.parse(JSON.stringify(saved)) : defaultEntry();
@@ -1910,7 +1968,7 @@ function renderDash() {
   // Today glance
   const mealsDone = Object.values(currentEntry.food.meals).filter(Boolean).length;
   const medsDone = Object.values(currentEntry.meds).filter(Boolean).length;
-  const totalMeds = MEDS.reduce((s,g)=>s+g.items.length,0);
+  const totalMeds = getTodayScheduledSupplements().length;
   const flareStatus = currentEntry.flare.status;
   const flareColor = {good:'dot-green',mild:'dot-amber',warm:'dot-amber',flare:'dot-red'}[flareStatus];
 
@@ -2865,32 +2923,29 @@ function changeCheat(id, delta) {
 // ═══════════════════════════════════════════════════════
 
 function renderMeds() {
-  const todayDow = new Date().getDay();
-  const isWeekend = todayDow === 0 || todayDow === 6;
-  document.getElementById('medList').innerHTML = MEDS.map(group => {
-    const items = group.items.map(med => {
-      if(med.id === 'huperzine' && isWeekend) {
-        return `<div class="med-item" style="opacity:.45;pointer-events:none">
-          <div class="med-icon">${med.icon}</div>
-          <div class="med-check"></div>
-          <div class="med-info">
-            <div class="med-name">${med.name}</div>
-            <div class="med-dose">Rest day — skip today</div>
-          </div>
-        </div>`;
-      }
-      const done = currentEntry.meds[med.id];
-      return `<div class="med-item${done?' done':''}" onclick="toggleMed('${med.id}')">
-        <div class="med-icon">${med.icon}</div>
+  const today = getTodayScheduledSupplements();
+  if (!today.length) {
+    document.getElementById('medList').innerHTML =
+      '<div class="empty-state" style="color:var(--dim);font-size:13px;padding:20px 0 10px;text-align:center">No supplements scheduled — add them in Settings</div>';
+    return;
+  }
+  const groups = {};
+  SUPP_TIME_ORDER.forEach(t => { groups[t] = []; });
+  today.forEach(s => { if (groups[s.time_of_day]) groups[s.time_of_day].push(s); });
+  document.getElementById('medList').innerHTML = SUPP_TIME_ORDER.filter(t => groups[t].length).map(t => {
+    const items = groups[t].map(s => {
+      const done = currentEntry.meds[s.id];
+      return `<div class="med-item${done?' done':''}" onclick="toggleMed('${s.id}')">
+        <div class="med-icon">💊</div>
         <div class="med-check">${done?'✓':''}</div>
         <div class="med-info">
-          <div class="med-name">${med.name}</div>
-          <div class="med-dose">${med.dose}</div>
+          <div class="med-name">${s.name}</div>
+          ${s.dosage ? `<div class="med-dose">${s.dosage}</div>` : ''}
         </div>
       </div>`;
     }).join('');
     return `<div class="med-time-group">
-      <div class="med-time-lbl">${group.time}</div>
+      <div class="med-time-lbl">${SUPP_TIME_LABELS[t]}</div>
       ${items}
     </div>`;
   }).join('');
@@ -4722,6 +4777,7 @@ function openSettings() {
   renderTriggers();
   renderScheduleStatus();
   renderProgressionDefaults();
+  renderSupplementScheduleSettings();
   document.getElementById('settingsPanel').classList.add('open');
 }
 
@@ -5027,6 +5083,141 @@ async function saveTriggers() {
 // SETTINGS
 // ═══════════════════════════════════════════════════════
 
+const SUPP_TIME_ORDER = ['wake_up','morning','lunch','afternoon','bedtime'];
+const SUPP_TIME_LABELS = {wake_up:'Wake Up',morning:'Morning',lunch:'Lunch',afternoon:'Afternoon',bedtime:'Bedtime'};
+
+async function loadSupplementSchedule() {
+  if (!USER_ID) return;
+  try {
+    supplementSchedule = await supaFetch('supplement_schedule', `user_id=eq.${USER_ID}&order=sort_order.asc,created_at.asc`);
+  } catch(e) { supplementSchedule = []; }
+}
+
+function getTodayScheduledSupplements() {
+  const ld = getLocalDateStr().split('-').map(Number);
+  const dayAbbr = ['sun','mon','tue','wed','thu','fri','sat'][new Date(ld[0],ld[1]-1,ld[2]).getDay()];
+  return supplementSchedule.filter(s => s.is_active && Array.isArray(s.days) && s.days.includes(dayAbbr));
+}
+
+function renderSupplementScheduleSettings() {
+  const el = document.getElementById('suppSchedList');
+  if (!el) return;
+  if (!supplementSchedule.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">No supplements added yet</div>';
+    return;
+  }
+  const groups = {};
+  SUPP_TIME_ORDER.forEach(t => { groups[t] = []; });
+  supplementSchedule.forEach(s => { if (groups[s.time_of_day]) groups[s.time_of_day].push(s); });
+  el.innerHTML = SUPP_TIME_ORDER.filter(t => groups[t].length).map(t => {
+    const rows = groups[t].map(s => {
+      const dimStyle = s.is_active ? '' : 'opacity:.4;';
+      const days = Array.isArray(s.days) ? s.days.join(' ') : '';
+      return `<div class="supp-row" style="${dimStyle}">
+        <div class="supp-row-info">
+          <div class="supp-row-name">${s.name}</div>
+          <div class="supp-row-meta">${s.dosage||''}${s.dosage&&days?' · ':''}${days}</div>
+        </div>
+        <div class="supp-row-btns">
+          <button class="supp-row-btn" onclick="showSuppForm('${s.id}')">EDIT</button>
+          <button class="supp-row-btn del" onclick="deleteSuppEntry('${s.id}')">DEL</button>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">${SUPP_TIME_LABELS[t]}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function showSuppForm(id) {
+  editingSuppId = id || null;
+  document.getElementById('suppName').value = '';
+  document.getElementById('suppDosage').value = '';
+  document.getElementById('suppTime').value = 'morning';
+  document.getElementById('suppActive').checked = true;
+  document.querySelectorAll('.supp-day-cb').forEach(cb => { cb.checked = true; });
+  if (id) {
+    const s = supplementSchedule.find(x => x.id === id);
+    if (s) {
+      document.getElementById('suppName').value = s.name;
+      document.getElementById('suppDosage').value = s.dosage || '';
+      document.getElementById('suppTime').value = s.time_of_day;
+      document.getElementById('suppActive').checked = s.is_active;
+      document.querySelectorAll('.supp-day-cb').forEach(cb => {
+        cb.checked = Array.isArray(s.days) && s.days.includes(cb.value);
+      });
+    }
+  }
+  document.getElementById('suppForm').style.display = '';
+  document.getElementById('suppName').focus();
+}
+
+function hideSuppForm() {
+  document.getElementById('suppForm').style.display = 'none';
+  editingSuppId = null;
+}
+
+async function saveSuppEntry() {
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) return;
+  if (session.access_token !== currentSession?.access_token) setSession(session);
+  const name = (document.getElementById('suppName').value || '').trim();
+  if (!name) { showToast('NAME REQUIRED'); return; }
+  const days = [...document.querySelectorAll('.supp-day-cb')].filter(cb => cb.checked).map(cb => cb.value);
+  if (!days.length) { showToast('SELECT AT LEAST ONE DAY'); return; }
+  const payload = {
+    name,
+    dosage: (document.getElementById('suppDosage').value || '').trim() || null,
+    time_of_day: document.getElementById('suppTime').value,
+    days,
+    is_active: document.getElementById('suppActive').checked,
+    updated_at: new Date().toISOString(),
+  };
+  const hdrs = { ...getHeaders(), 'Prefer': 'return=representation' };
+  let res;
+  if (editingSuppId) {
+    res = await fetch(`${SUPA_URL}/rest/v1/supplement_schedule?id=eq.${editingSuppId}&user_id=eq.${USER_ID}`, {
+      method: 'PATCH', headers: hdrs, body: JSON.stringify(payload)
+    });
+  } else {
+    res = await fetch(`${SUPA_URL}/rest/v1/supplement_schedule`, {
+      method: 'POST', headers: hdrs,
+      body: JSON.stringify({ ...payload, user_id: USER_ID, created_at: new Date().toISOString() })
+    });
+  }
+  if (!res.ok) { showToast('SAVE FAILED'); return; }
+  const rows = await res.json().catch(() => []);
+  if (editingSuppId) {
+    const idx = supplementSchedule.findIndex(s => s.id === editingSuppId);
+    if (idx >= 0 && rows[0]) supplementSchedule[idx] = rows[0];
+  } else {
+    if (rows[0]) supplementSchedule.push(rows[0]);
+  }
+  const msg = editingSuppId ? 'SUPPLEMENT UPDATED ✓' : 'SUPPLEMENT ADDED ✓';
+  hideSuppForm();
+  renderSupplementScheduleSettings();
+  renderMeds();
+  renderDash();
+  showToast(msg);
+}
+
+async function deleteSuppEntry(id) {
+  const session = await getOrRefreshSession();
+  if (!session?.user?.id) return;
+  if (session.access_token !== currentSession?.access_token) setSession(session);
+  const res = await fetch(`${SUPA_URL}/rest/v1/supplement_schedule?id=eq.${id}&user_id=eq.${USER_ID}`, {
+    method: 'DELETE', headers: getHeaders()
+  });
+  if (!res.ok) { showToast('DELETE FAILED'); return; }
+  supplementSchedule = supplementSchedule.filter(s => s.id !== id);
+  renderSupplementScheduleSettings();
+  renderMeds();
+  renderDash();
+  showToast('SUPPLEMENT REMOVED');
+}
+
 function renderSettings() {
   const emailEl = document.getElementById('settingsEmail');
   if (emailEl) emailEl.textContent = currentSession?.user?.email || '—';
@@ -5323,15 +5514,16 @@ function renderDayView() {
   // ── SUPPLEMENTS
   const meds = e.meds || {};
   const medsDone = Object.entries(meds).filter(([,v])=>v);
-  const totalMeds = MEDS.reduce((s,g)=>s+g.items.length,0);
+  const suppMap = Object.fromEntries(supplementSchedule.map(s => [s.id, s]));
+  const totalMeds = supplementSchedule.filter(s=>s.is_active).length;
   html += `<div class="card"><div class="card-hdr"><div class="card-icon">💊</div><div class="card-title">SUPPLEMENTS</div></div><div class="card-body">`;
   if (!medsDone.length) {
     html += `<div class="empty-state">None logged</div>`;
   } else {
     html += `<div class="ts-row"><div class="ts-icon">✓</div><div class="ts-label">Taken</div><div class="ts-val" style="color:var(--green)">${medsDone.length} / ${totalMeds}</div></div>`;
     medsDone.forEach(([id]) => {
-      const med = MEDS.flatMap(g=>g.items).find(m=>m.id===id);
-      if (med) html += `<div class="ts-row" style="padding:3px 0"><div class="ts-icon">${med.icon}</div><div class="ts-label" style="font-size:12px">${med.name}</div></div>`;
+      const sup = suppMap[id] || MEDS.flatMap(g=>g.items).find(m=>m.id===id);
+      if (sup) html += `<div class="ts-row" style="padding:3px 0"><div class="ts-icon">${sup.icon||'💊'}</div><div class="ts-label" style="font-size:12px">${sup.name}</div></div>`;
     });
   }
   html += `</div></div>`;
