@@ -1,4 +1,4 @@
-# CLAUDE.md — Lost Thread / Track-Check
+﻿# CLAUDE.md — Lost Thread / Track-Check
 
 Auto-read by Claude Code every session. Do not delete.
 
@@ -202,3 +202,4 @@ Cardio helper functions: `schedCardioField`, `schedCardioToggleInterval`, `sched
 [2026-06-20] Fixed: ghost lbs input on exercises with no custom_name, renderScheduledWorkout, ~line 2277
 [2026-06-20] Added: cardio cards (Walk/Jog/Run/Bike) with speed/incline/interval mode, renderScheduledWorkout + schedExSaveOne, ~line 2210
 [2026-06-20] Added: weather bar on DASH (#weather-bar, fetchAndLogWeather), Open-Meteo geolocation, weather_logs PATCH/POST, pressure trend
+[2026-06-21] Added: Update Schedule (merge) mode on schedule upload — modal now offers Replace vs Update; confirmUpdateSchedule() merges partial Excel into existing plan by week/day, appends non-duplicate exercises, shows days-updated/added toast; saveWorkoutSchedule gains optional toastMsg param, ~lines 1187-1204, 4870, 4919
