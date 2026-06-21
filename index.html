@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <!--
   INDEX.HTML — TABLE OF CONTENTS
@@ -1185,11 +1185,12 @@ select:focus{outline:none;border-color:var(--amber)}
 <div id="scheduleResetModal" class="overlay-centered">
   <div class="modal-card">
     <div id="scheduleResetStep1">
-      <div class="modal-title">Replace your current schedule?</div>
+      <div class="modal-title">Schedule Upload</div>
       <div class="modal-sub" id="scheduleResetSub"></div>
-      <div class="modal-actions">
-        <button class="save-btn" style="flex:1" onclick="confirmReplaceSchedule()">Replace</button>
-        <button class="save-btn" style="flex:0 0 auto;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="cancelScheduleUpload()">Cancel</button>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+        <button class="save-btn" style="width:100%" onclick="confirmReplaceSchedule()">Replace Schedule</button>
+        <button class="save-btn" id="updateScheduleBtn" style="width:100%;background:var(--s3);color:var(--text);border:1px solid var(--border2)" onclick="confirmUpdateSchedule()">Update Schedule (merge)</button>
+        <button onclick="cancelScheduleUpload()" style="display:block;margin-top:4px;background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer;text-align:center;width:100%">Cancel</button>
       </div>
     </div>
     <div id="scheduleResetStep2" style="display:none">
@@ -4866,7 +4867,56 @@ async function confirmStartWeek(startWeek) {
   pendingScheduleData = null;
 }
 
-async function saveWorkoutSchedule(payload) {
+async function confirmUpdateSchedule() {
+  document.getElementById('scheduleResetModal').style.display = 'none';
+  const d = pendingScheduleData;
+  if (!d) return;
+
+  const mergeSchedule = JSON.parse(JSON.stringify(currentSchedule?.schedule || {}));
+  let daysUpdated = 0;
+  let daysAdded = 0;
+
+  Object.entries(d.schedule).forEach(([week, days]) => {
+    if (!mergeSchedule[week]) mergeSchedule[week] = {};
+    Object.entries(days).forEach(([day, exercises]) => {
+      if (mergeSchedule[week][day]) {
+        const existingNames = new Set(mergeSchedule[week][day].map(ex => ex.name.toLowerCase()));
+        let appended = 0;
+        exercises.forEach(ex => {
+          if (!existingNames.has(ex.name.toLowerCase())) {
+            mergeSchedule[week][day].push(ex);
+            existingNames.add(ex.name.toLowerCase());
+            appended++;
+          }
+        });
+        if (appended > 0) daysUpdated++;
+      } else {
+        mergeSchedule[week][day] = exercises;
+        daysAdded++;
+      }
+    });
+  });
+
+  const totalWeeks = Math.max(currentSchedule?.total_weeks || 0, d.total_weeks);
+  const toast = `${daysUpdated} DAY${daysUpdated !== 1 ? 'S' : ''} UPDATED, ${daysAdded} ADDED`;
+
+  await saveWorkoutSchedule({
+    user_id: USER_ID,
+    name: currentSchedule?.name || d.name,
+    total_weeks: totalWeeks,
+    current_week: currentSchedule?.current_week || 1,
+    week_start_date: currentSchedule?.week_start_date || getLocalDateStr(),
+    schedule: mergeSchedule,
+    progress_threshold: currentSchedule?.progress_threshold || parseInt(document.getElementById('progressThreshold')?.value) || 3,
+    progress_increment: currentSchedule?.progress_increment || parseFloat(document.getElementById('progressIncrement')?.value) || 5,
+    progress_unit: currentSchedule?.progress_unit || document.getElementById('progressUnit')?.value || 'lbs',
+    updated_at: new Date().toISOString(),
+  }, toast);
+
+  pendingScheduleData = null;
+}
+
+async function saveWorkoutSchedule(payload, toastMsg) {
   const session = await getOrRefreshSession();
   if (!session?.user?.id) return;
   if (session.access_token !== currentSession?.access_token) setSession(session);
@@ -4880,7 +4930,7 @@ async function saveWorkoutSchedule(payload) {
     if (patched.length > 0) {
       currentSchedule = patched[0];
       renderScheduleStatus();
-      showToast('SCHEDULE SAVED ✓');
+      showToast(toastMsg || 'SCHEDULE SAVED ✓');
       return;
     }
   }
@@ -4893,7 +4943,7 @@ async function saveWorkoutSchedule(payload) {
     const rows = await postR.json().catch(() => []);
     currentSchedule = rows[0] || payload;
     renderScheduleStatus();
-    showToast('SCHEDULE SAVED ✓');
+    showToast(toastMsg || 'SCHEDULE SAVED ✓');
   } else {
     showToast('SCHEDULE SAVE FAILED');
   }
