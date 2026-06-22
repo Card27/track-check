@@ -601,6 +601,8 @@ select:focus{outline:none;border-color:var(--amber)}
 .sched-check.done::after{content:'✓';font-size:12px;font-weight:700}
 .sched-ex-name{flex:1;font-size:13px;font-weight:600;color:var(--text)}
 .sched-ex-badge{font-size:10px;color:var(--dim);font-family:var(--font-mono)}
+.sched-video-btn{background:none;border:none;color:var(--dim);font-size:13px;cursor:pointer;padding:0 2px;flex-shrink:0;opacity:.6;transition:opacity .15s,transform .15s;line-height:1}
+.sched-video-btn:hover{opacity:1;transform:scale(1.2)}
 .sched-ex-body{display:none;padding:0 13px 13px}
 .sched-ex-body.open{display:block}
 .sched-ex-sets{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
@@ -2597,6 +2599,7 @@ function renderScheduledWorkout() {
         <div class="sched-ex-hdr" onclick="schedExToggle('${exId}')">
           <div class="${checkClass}" id="schedCheck_${exId}"></div>
           <div class="sched-ex-name">${escHtml(ex.name)}${progressBadge}</div>
+          ${ex.video_link ? `<button class="sched-video-btn" onclick="event.stopPropagation();window.open(this.dataset.url,'_blank')" data-url="${escHtml(ex.video_link)}" title="Watch video">📹</button>` : ''}
           <div class="sched-ex-badge">${badgeText}</div>
         </div>
         <div class="${bodyClass}" id="schedBody_${exId}">
