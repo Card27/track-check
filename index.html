@@ -1495,6 +1495,7 @@ let fsSlot = null;
 let fsSelected = null;
 let fsUnit = 'g';
 let fsServings = 100;
+let _ydayResults = [];
 let fsServingGrams = 100;
 let fsServingEstimated = true;
 let fsDetailSlot = 'breakfast';
@@ -3734,21 +3735,90 @@ function calcMacrosForEntry(food, unit, servings) {
 
 function openFoodSearch(slot) {
   fsSlot = slot;
+  _ydayResults = [];
   const el = document.getElementById('fsSlotHint');
   if (el) el.textContent = slot ? 'Adding to ' + slot.charAt(0).toUpperCase() + slot.slice(1) : '';
   document.getElementById('fsInput').value = '';
-  document.getElementById('fsResults').innerHTML = '';
+  document.getElementById('fsResults').innerHTML = '<div style="color:var(--dim);font-size:12px;padding:12px 0;text-align:center">Loading...</div>';
   document.getElementById('foodSearchSheet').classList.add('open');
   setTimeout(() => document.getElementById('fsInput').focus(), 120);
+  loadYesterdaySection();
 }
 
 function closeFoodSearch() {
   document.getElementById('foodSearchSheet').classList.remove('open');
 }
 
+async function loadYesterdaySection() {
+  const el = document.getElementById('fsResults');
+  if (!el) return;
+  const ydayStr = getLocalDateStr(new Date(Date.now() - 86400000));
+  let rows;
+  try {
+    rows = await supaFetch('food_logs', `user_id=eq.${USER_ID}&log_date=eq.${ydayStr}&select=meals&limit=1`);
+    console.log('[Yesterday food_log raw]', rows);
+  } catch(e) {
+    console.error('[Yesterday food_log error]', e);
+    el.innerHTML = '';
+    return;
+  }
+  _ydayResults = (Array.isArray(rows) && rows[0]?.meals?.entries) || [];
+  renderYesterdaySection();
+}
+
+function renderYesterdaySection() {
+  const el = document.getElementById('fsResults');
+  if (!el || (document.getElementById('fsInput').value || '').trim()) return;
+  if (!_ydayResults.length) {
+    el.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:12px 0;text-align:center">No meals logged yesterday</div>';
+    return;
+  }
+  const groups = {};
+  MEAL_SLOTS.forEach(s => { groups[s] = []; });
+  _ydayResults.forEach((e, i) => {
+    const slot = MEAL_SLOTS.includes(e.meal_slot) ? e.meal_slot : 'snacks';
+    groups[slot].push({ ...e, _idx: i });
+  });
+  let html = '<div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.7px;margin:8px 0 6px">Yesterday</div>';
+  MEAL_SLOTS.forEach(slot => {
+    if (!groups[slot].length) return;
+    html += `<div style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 4px">${SLOT_LABELS[slot]}</div>`;
+    groups[slot].forEach(e => {
+      html += `<div class="food-result" onclick="reuseYdayEntry(${e._idx})">
+        <div class="food-result-info">
+          <div class="food-result-name">${escHtml(e.name)}</div>
+          <div class="food-result-cal">${Math.round(e.cal||0)} cal \xB7 ${Math.round(e.protein||0)}g P \xB7 ${Math.round(e.carbs||0)}g C \xB7 ${Math.round(e.fat||0)}g F</div>
+        </div>
+        <div class="food-result-src" style="color:var(--dim)">YDAY</div>
+      </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function reuseYdayEntry(idx) {
+  const e = _ydayResults[idx];
+  if (!e) return;
+  const unitG = (e.unit === 'serving' && e.serving_g) ? e.serving_g : (UNIT_WEIGHTS[e.unit] || 1);
+  const wG = unitG * (e.servings || 1);
+  const fac = wG > 0 ? 100 / wG : 0;
+  const food = {
+    id: e.food_id || null,
+    name: e.name,
+    cal_per_100g:     (e.cal     || 0) * fac,
+    protein_per_100g: (e.protein || 0) * fac,
+    carbs_per_100g:   (e.carbs   || 0) * fac,
+    fat_per_100g:     (e.fat     || 0) * fac,
+    inflammatory_score: e.inflammatory_score || 0,
+    serving_g: e.serving_g || null,
+    _source: 'RECENT',
+  };
+  openFoodDetail(food, fsSlot || e.meal_slot || 'snacks');
+}
+
 async function doFoodSearch(term) {
   const q = (term || '').trim();
-  if (!q || q.length < 2) { document.getElementById('fsResults').innerHTML = ''; return; }
+  if (!q || q.length < 2) { renderYesterdaySection(); return; }
   document.getElementById('fsResults').innerHTML = '<div class="empty-state">Searching...</div>';
   const [recipes, prev, cached, live] = await Promise.all([
     fetchUserRecipes(q), fetchPrevFoods(q), fetchCachedFoods(q), fetchLiveFoods(q)
