@@ -2428,7 +2428,7 @@ function renderScheduledWorkout() {
   const progressIncrement = parseFloat(currentSchedule.progress_increment) || 5;
   const progressUnit = currentSchedule.progress_unit || 'lbs';
 
-  const CARDIO_NAMES = ['walk', 'jog', 'run', 'bike'];
+  const CARDIO_NAMES = ['walk', 'jog', 'run', 'bike', 'treadmill'];
 
   let cardsHtml = exercises.map(ex => {
     const exId = ex.id;
@@ -2513,6 +2513,11 @@ function renderScheduledWorkout() {
               <div class="sched-cardio-label">INCLINE (%)</div>
               <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.5" placeholder="1.0" value="${cGet('incline')}"
                 onchange="schedCardioField('${exId}','incline',this.value)">
+            </div>
+            <div class="sched-cardio-field">
+              <div class="sched-cardio-label">DISTANCE (mi)</div>
+              <input class="sched-cardio-inp" type="number" inputmode="decimal" step="0.01" placeholder="1.75" value="${cGet('distance')}"
+                onchange="schedCardioField('${exId}','distance',this.value)">
             </div>
           </div>
           <button class="sched-interval-link" onclick="schedCardioToggleInterval('${exId}')">+ Add Intervals</button>`;
@@ -2676,7 +2681,7 @@ async function schedExSaveOne(exId) {
   const isTimed    = !!ex.time && !ex.sets && !ex.reps;
   const isSetsHold = !!ex.sets && !!ex.time && !ex.reps;
   const hasCustom  = !!(ex.custom_name && ex.custom_name.trim());
-  const isCardio   = isTimed && ['walk','jog','run','bike'].includes((ex.name||'').toLowerCase().trim());
+  const isCardio   = isTimed && ['walk','jog','run','bike','treadmill'].includes((ex.name||'').toLowerCase().trim());
 
   if (!currentEntry.workout.scheduledExercises) currentEntry.workout.scheduledExercises = {};
   const prev = currentEntry.workout.scheduledExercises[exId] || {};
@@ -2687,7 +2692,7 @@ async function schedExSaveOne(exId) {
   if (isCardio) {
     const cs = state.cardio || {};
     const useIntervals = !!cs.intervalMode && (cs.intervals || []).length > 0;
-    let duration, speed, incline, intervals;
+    let duration, speed, incline, distance, intervals;
     if (useIntervals) {
       intervals = (cs.intervals || []).map(seg => ({
         duration: parseFloat(seg.duration) || 0,
@@ -2698,13 +2703,14 @@ async function schedExSaveOne(exId) {
       speed = null; incline = null;
     } else {
       duration = parseFloat(cs.duration) || 0;
-      speed    = cs.speed   !== '' && cs.speed   != null ? parseFloat(cs.speed)   : null;
-      incline  = cs.incline !== '' && cs.incline != null ? parseFloat(cs.incline) : null;
+      speed    = cs.speed    !== '' && cs.speed    != null ? parseFloat(cs.speed)    : null;
+      incline  = cs.incline  !== '' && cs.incline  != null ? parseFloat(cs.incline)  : null;
+      distance = cs.distance !== '' && cs.distance != null ? parseFloat(cs.distance) : null;
       intervals = [];
     }
     currentEntry.workout.scheduledExercises[exId] = {
       name: ex.name, type: 'cardio', done: true, completed: true,
-      duration, speed, incline, intervals,
+      duration, speed, incline, distance, intervals,
       consecutive_successes: duration > 0 ? prevConsec + 1 : 0,
       logged_at: new Date().toISOString()
     };
